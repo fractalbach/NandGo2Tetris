@@ -10,7 +10,7 @@ How to Get
 -------------
 
 ~~~
-go get github.com/fractalbach/hackasm
+go get github.com/fractalbach/nand2tetris/hackasm
 ~~~
 
 
@@ -21,14 +21,14 @@ Usage
 hackasm [-o OUTPUT] INPUT
 ~~~
 
+If output filename is specified, the default output location
+is the input filename with a .hack file extention.
+
 
 
 How it Works
 -------------------
 
+	
 
 
-
-1.
-2. First Pass
-3. Second Pass
