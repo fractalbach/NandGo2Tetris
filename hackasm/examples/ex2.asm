@@ -1,12 +1,14 @@
+
+
 // This is a random example file.
 // Comments don't go into machine code.
 
-@10
-M=1
+@10   // remove this comment
+M=1  //Here's another one / / /// / strange one.
 
-@15
-M=0
-
+@15  //\/\/\/\//\/\\///\/\\/\\/\
+M=0 
+ 
 @12
 M=A
 
@@ -37,3 +39,7 @@ D; JEQ
 (END)
 @END
 0; JMP
+
+
+
+//empty space
