@@ -1,0 +1,7 @@
+push constant 10
+push constant 11
+add
+push constant 40
+push constant 30
+add
+add
