@@ -1,7 +1,7 @@
 package main
 
 import (
-	"strconv"
+	"fmt"
 )
 
 var (
@@ -65,10 +65,9 @@ func WriteArithmetic(command string) string {
 // Pushes the value in the D register onto the stack.
 const S_PUSH = `// push d
 @SP
-A=M
-M=D
-@SP
 M=M+1
+A=M-1
+M=D
 `
 
 // Pops the top element from the stack and places it in register D.
@@ -139,19 +138,21 @@ var (
 // 		JLT   Jump if less than
 //      JGT   jump if greater than
 //
-func inequality(comment string, assembly string, location_count int) string {
-	count := strconv.Itoa(location_count)
-	return comment + `
+const S_INEQ = `%s
 @SP
 AM=M-1
 D=M
 A=A-1
 D=M-D
 M=-1
-@INEQLOCATION` + count + "\nD;" + assembly + `
+@LOCATION%d
+D; %s
 M=0
-(INEQLOCATION` + count + `)
+(LOCATION%d)
 `
+
+func inequality(comment string, assembly string, counter int) string {
+	return fmt.Sprintf(S_INEQ, comment, counter, assembly, counter)
 }
 
 func S_JEQ(location int) string {
@@ -172,4 +173,71 @@ func S_JGT(location int) string {
 func next(count *int) int {
 	*count++
 	return *count
+}
+
+var segment_map = map[string]string{
+	"local": "LCL",
+	"arg":   "ARG",
+}
+
+func (cmd *Command) WritePushPop() string {
+
+	// retrieve the assembly equivalent of the given segment.
+	// if it can't be found, then you've been given a bad segment.
+	segment, ok := segment_map[cmd.Arg1]
+	if !ok {
+		return ""
+	}
+
+	switch cmd.Kind {
+	case C_POP:
+		return pop(segment, cmd.Arg2)
+	case C_PUSH:
+		return push(segment, cmd.Arg2)
+	default:
+		panic("Needs to be a Push or Pop command.")
+	}
+
+	panic("Invalid push/pop command.")
+}
+
+// Special Push Example.
+// 		Variable Order:
+// 		(string, int, int, string)
+const special_push = `// push %s %d
+@%d
+D=A
+@%s
+A=A+D
+D=M
+@SP
+M=M+1
+A=M-1
+M=D
+`
+
+func push(s string, n int) string {
+	return fmt.Sprintf(special_push, s, n, n, s)
+}
+
+// Special Memory Access Pop Command.
+// 		Variable Order:
+// 		(string, int, int, string)
+const special_pop = `// pop %s %d
+@%d
+D=A
+@%s
+D=A+D
+@R13
+M=D
+@SP
+AM=M-1
+D=M
+@R13
+A=M
+M=D
+`
+
+func pop(s string, n int) string {
+	return fmt.Sprintf(special_pop, s, n, n, s)
 }

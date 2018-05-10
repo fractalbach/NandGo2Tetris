@@ -91,7 +91,7 @@ func getCommandFromLine(line string) (string, error) {
 		return WriteArithmetic(cmd.Arg1), nil
 
 	case C_POP, C_PUSH:
-
+		return cmd.WritePushPop(), nil
 	}
 
 	// Convert into a string.
@@ -120,7 +120,7 @@ func getCommandFromFields(fields []string) (*Command, error) {
 	// Arg1 is a string defining the location in memory.
 	// Arg2 is a integer defining offset from location.
 	case "push":
-		cmd.Kind = C_POP
+		cmd.Kind = C_PUSH
 		cmd.addPushPopArgs(fields)
 
 	case "pop":
@@ -152,11 +152,11 @@ func (cmd *Command) addPushPopArgs(fields []string) error {
 	// The second argument is an integer, so it must be
 	// converted from ASCII before it can saved.
 	// Return any errors in the process of doing this.
-	s, err := strconv.Atoi(fields[2])
+	i, err := strconv.Atoi(fields[2])
 	if err != nil {
 		return err
 	}
-	cmd.Arg2 = s
+	cmd.Arg2 = i
 
 	// No errors!  Arguments have succesfully been added!
 	return nil
