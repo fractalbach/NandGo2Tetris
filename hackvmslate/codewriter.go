@@ -1,10 +1,18 @@
 package main
 
-// TODO LIST
+import (
+	"strconv"
+)
+
+// Location of Stuff in the Stack
 //
-// Multiply
-// Divide?? (might not need to do this)
+// 			| ... |
+// 			|  x  |
+// 			|  y  |
+//          |     |  <- Stack Pointer (SP)
 //
+// Arithmetic is in the form of x _ y,
+// where _ is an operator (like +, -, <, >, =)
 //
 
 // Pushes the value in the D register onto the stack.
@@ -21,11 +29,22 @@ const S_POP = `// pop d
 AM=M-1
 D=M`
 
-// Negates the top element on the stack.  Doesn't change the stack in any other way.
+// Bit-wise NOT on the top element on the stack.
+// Only affects one element.
+// Does not pop the stack.
 const S_NOT = `
 @SP
-A=M
+A=M-1
 M=!M
+`
+
+// Negation of the top element on the stack.
+// Only affects one element.
+// Does not pop the stack.
+const S_NEG = `
+@SP
+A=M-1
+M=-M
 `
 
 // ALU_arithemtic returns the assembly instructions for stack arithemtic.
@@ -60,14 +79,50 @@ var (
 	S_OR  = ALU_arithmetic("// OR", "M=M|D")
 )
 
-// empty string.
 const S_ = ``
 
-/*
-``
+// INEQUALITY requires similar parameters to the ALU_ARITHMETIC,
+// but also requires a name for the "checkpoint" variable.  It does not
+// determine this on it's own, because it may cause conflicts with other
+// jump variables depending on the context.
+//
+// For the assembly parameter, write one of the following:
+//
+// 		JEQ   Jump if equal to
+// 		JLT   Jump if less than
+//      JGT   jump if greater than
+//
+func inequality(comment string, assembly string, location_count int) string {
+	count := strconv.Itoa(location_count)
+	return comment + `
 @SP
-A=M
-M=D
-@SP
-M=M+1
-*/
+AM=M-1
+D=M
+A=A-1
+D=M-D
+M=-1
+@INEQLOCATION` + count + "\nD;" + assembly + `
+M=0
+(INEQLOCATION` + count + `)
+`
+}
+
+func S_JEQ(location int) string {
+	return inequality("// true if x = y, else false", "JEQ", location)
+}
+
+func S_JLT(location int) string {
+	return inequality("// true if x < y, else false", "JLT", location)
+}
+
+func S_JGT(location int) string {
+	return inequality("// true if x > y, else false", "JGT", location)
+}
+
+// next accepts a pointer to an integer, increments it,
+// and then returns its new value.  The incremented value
+// will be saved in it's original variable.
+func next(count *int) int {
+	*count++
+	return *count
+}

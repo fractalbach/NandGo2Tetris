@@ -25,6 +25,16 @@ func main() {
 		failrar(err)
 	}
 
+	count := 0
+
+	x := S_JEQ(next(&count))
+	y := S_JGT(next(&count))
+	z := S_JLT(next(&count))
+
+	fmt.Println(x)
+	fmt.Println(y)
+	fmt.Println(z)
+
 	fmt.Printf("%v\n%s", data, data)
 
 	// DEBUG:

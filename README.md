@@ -14,9 +14,9 @@ Also, because it was a lot of fun ;)
 
 # The Programs
 
-- [x] Assembler
-- [ ] VM Translator
-- [ ] High Level Compiler
+- [x] (HACK Assembler)[hackasm] converts Assembly to Machine Code.
+- [ ] ***In Progress*** - (HACK VM Translator)[hackvmslate] converts VM code into assembly.
+- [ ] (HACK Compiler) converts code in a High Level Programming Language into VM code.
 
 
 
