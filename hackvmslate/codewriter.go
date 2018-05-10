@@ -24,32 +24,34 @@ var (
 // Arithmetic is in the form of x _ y,
 // where _ is an operator (like +, -, <, >, =)
 //
-func WriteArithmetic(command int) string {
+func WriteArithmetic(command string) string {
 	switch command {
 
 	// Basic arithemtic and bit-wise commands are straight forward,
 	// and always have the same representation in assembly.
 
-	case C_ADD:
+	case "add":
 		return S_ADD
-	case C_SUB:
+	case "sub":
 		return S_SUB
-	case C_NOT:
+	case "not":
 		return S_NOT
-	case C_AND:
+	case "and":
 		return S_AND
-	case C_OR:
+	case "or":
 		return S_OR
+	case "neg":
+		return S_NEG
 
 	// When comparing inequalities, we need to include jumps.
 	// in order to avoid conflicts of jumps, increment
 	// the location counter by 1 prior to return the string.
 
-	case C_EQ:
+	case "eq":
 		return S_JEQ(next(&location_counter))
-	case C_GT:
+	case "gt":
 		return S_JGT(next(&location_counter))
-	case C_LT:
+	case "lt":
 		return S_JLT(next(&location_counter))
 	}
 
@@ -66,18 +68,20 @@ const S_PUSH = `// push d
 A=M
 M=D
 @SP
-M=M+1`
+M=M+1
+`
 
 // Pops the top element from the stack and places it in register D.
 const S_POP = `// pop d
 @SP
 AM=M-1
-D=M`
+D=M
+`
 
 // Bit-wise NOT on the top element on the stack.
 // Only affects one element.
 // Does not pop the stack.
-const S_NOT = `
+const S_NOT = `// bitwise NOT
 @SP
 A=M-1
 M=!M
@@ -86,7 +90,7 @@ M=!M
 // Negation of the top element on the stack.
 // Only affects one element.
 // Does not pop the stack.
-const S_NEG = `
+const S_NEG = `// negation
 @SP
 A=M-1
 M=-M
