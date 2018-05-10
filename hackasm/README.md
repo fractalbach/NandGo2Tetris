@@ -1,9 +1,17 @@
-Hack Assembly in Go
+Hack Assembler
 ===========================
 
-- Converts assembly code into machine code instructions.
-- Resolves custom symbols to memory addresses.
-- Disassemble machine code back into assembly.
+hackasm.go is a [Multi-Pass Assembler](https://en.wikipedia.org/wiki/Assembly_language#Number_of_passes),
+which builds up a [Symbol table](https://en.wikipedia.org/wiki/Symbol_table) by scanning through 
+the source assembly file multiple times.  There are two main types of symbols:  **Variables** and **Locations**.
+
+Locations are used like "waypoints", creating a place to "jump" to (or "goto").  They specify the actual line of machine code that the [Program counter](https://en.wikipedia.org/wiki/Program_counter)  will change to.
+
+Variables store arbitrary values in memory registers that are determined by the assembler.  By convention of this specific assembly language, the variable start at the 17th register, and each new variable is inserted after that (17, 18, 19, ... ).
+
+The Assembler mostly just manipulates bytes and strings. The input is a file written in ASCII, filled with comments and spaces.  the output is a file with only 1s and 0s.  Each instruction is converted into a line of machine code, with a 1-to-1 correspondence.  This makes [Disassembly](https://en.wikipedia.org/wiki/Disassembler) possible, because you can then reverse the process, and retrieve most of the assembly source again.
+
+
 
 
 
