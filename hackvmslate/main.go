@@ -7,17 +7,23 @@ import (
 	"os"
 )
 
+const (
+	help_message = "USAGE: hackvmslate INPUT_FILENAME"
+)
+
 func main() {
+
+	// Checks to see if there are any arguments given.
+	// If not, then exit with help message.
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, help_message)
+		os.Exit(1)
+	}
 
 	// input file location as given by command argument.
 	input := ""
-	if len(os.Args) >= 2 {
-		input = os.Args[1]
-		fmt.Println(input)
-	} else {
-		fmt.Fprintln(os.Stderr, "USAGE: hackvmslate INPUT_FILENAME")
-		os.Exit(1)
-	}
+	input = os.Args[1]
+	fmt.Println(input)
 
 	// Load the file into memory.
 	data, err := ioutil.ReadFile(input)
@@ -25,6 +31,7 @@ func main() {
 		failrar(err)
 	}
 
+	// TESTING ZONE --------------------------------------
 	count := 0
 
 	x := S_JEQ(next(&count))
@@ -36,6 +43,7 @@ func main() {
 	fmt.Println(z)
 
 	fmt.Printf("%v\n%s", data, data)
+	//  --------------------------------------------------
 
 	// DEBUG:
 	// Print the byte array to stdout
