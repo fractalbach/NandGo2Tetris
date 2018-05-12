@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	// "github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/stack"
 )
 
 var (
 	location_counter = 0
+	static_counter   = 0
 )
 
 // WriteArithemtic accepts an arithemtic command and returns the
@@ -358,3 +360,21 @@ const s_pop_pointer_1 = `// pop pointer 1
 @THAT
 M=D
 `
+
+// usage: (n, filename, counter, PUSHD)
+const s_push_static = `// push static %d
+@%s.%s
+D=M
+%v
+`
+
+// usage: (n, POPD, filename, counter)
+const s_pop_static = `// pop static %d
+%v
+@%s.%s
+M=D
+`
+
+func popStatic(filename string, n int) {
+
+}

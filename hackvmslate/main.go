@@ -14,6 +14,7 @@ const (
 
 var (
 	interactive_mode = false
+	current_filename = ""
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 
 		// Open interactive mode by using stdin instead of file.
 		interactive_mode = true
+		current_filename = "stdin"
 		r = bufio.NewReader(os.Stdin)
 		w = bufio.NewWriter(os.Stdout)
 
@@ -48,6 +50,11 @@ func main() {
 			failrar(err)
 		}
 		defer input_file.Close()
+
+		// Sets the global variable containing current filename
+		// this is used by the translator when encounting
+		// static varibles
+		current_filename = filepath.Base(os.Args[1])
 
 		// Creates and Opens a file for writing.
 		// The filepath will be resolved automatically,
