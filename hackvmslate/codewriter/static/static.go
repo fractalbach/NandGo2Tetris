@@ -21,28 +21,28 @@ import (
 	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/stack"
 )
 
-// usage: (n, filename, counter, PUSHD)
 const s_push_static = `// push static %d
 @%s.%d
 D=M
 %v
 `
 
-// usage: (n, POPD, filename, counter)
 const s_pop_static = `// pop static %d
 %v
 @%s.%d
 M=D
 `
 
-// pushes the value at static[index] to the stack.
+// Push returns a string of asssembly instructions to push
+// the value at static[index] to the stack.
 // the symbol will be named @filename.index
-func push(filename string, index int) string {
+func Push(filename string, index int) string {
 	return fmt.Sprintf(s_push_static, index, filename, index, stack.PUSHD)
 }
 
-// pops the stack, and places the value into static[index].
+// Push returns a string of asssembly instructions to
+// pop the stack, and place the value into static[index].
 // the symbol will be named @filename.index
-func pop(filename string, index int) string {
+func Pop(filename string, index int) string {
 	return fmt.Sprintf(s_pop_static, index, stack.POPD, filename, index)
 }

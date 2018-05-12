@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	// "github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/stack"
+	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/static"
 )
 
 var (
@@ -184,6 +185,8 @@ func next(count *int) int {
 	return *count
 }
 
+// Segment_map contains a list of acceptable segments,
+// and maps certain segments to the symbol used in assembly.
 var segment_map = map[string]string{
 	"local":    "LCL",
 	"argument": "ARG",
@@ -191,6 +194,7 @@ var segment_map = map[string]string{
 	"that":     "THAT",
 	"temp":     "TMP",
 	"pointer":  "pointer",
+	"static":   "static",
 }
 
 func (cmd *Command) WritePushPop() string {
@@ -233,11 +237,15 @@ D=M
 `
 
 func push(s string, n int) string {
-	if s == "TMP" {
+	switch s {
+	case "TMP":
 		return pushTemp(n)
-	}
-	if s == "pointer" {
+
+	case "pointer":
 		return pushPointer(n)
+
+	case "static":
+		return static.Push(current_filename, n)
 	}
 	return fmt.Sprintf(push_thru_pointer, s, n, n, s, PUSHD)
 }
@@ -258,12 +266,21 @@ A=M
 M=D
 `
 
+// pop accepts the segment and index from a pop command.
+// returns the string containing assembly instructions.
+//
+// Based on the segment, a different function is used to
+// determine which function is returned.
 func pop(s string, n int) string {
-	if s == "TMP" {
+	switch s {
+	case "TMP":
 		return popTemp(n)
-	}
-	if s == "pointer" {
+
+	case "pointer":
 		return popPointer(n)
+
+	case "static":
+		return static.Pop(current_filename, n)
 	}
 	return fmt.Sprintf(pop_thru_pointer, s, n, n, s, POPD)
 }
@@ -360,21 +377,3 @@ const s_pop_pointer_1 = `// pop pointer 1
 @THAT
 M=D
 `
-
-// usage: (n, filename, counter, PUSHD)
-const s_push_static = `// push static %d
-@%s.%s
-D=M
-%v
-`
-
-// usage: (n, POPD, filename, counter)
-const s_pop_static = `// pop static %d
-%v
-@%s.%s
-M=D
-`
-
-func popStatic(filename string, n int) {
-
-}
