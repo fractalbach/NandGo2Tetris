@@ -1,4 +1,3 @@
-// sup./
 package main
 
 import (
@@ -43,9 +42,6 @@ func main() {
 
 	} else {
 
-		// input file location as given by command argument.
-		fmt.Println(os.Args[1])
-
 		// Attempt to open the file for reading.
 		input_file, err := os.Open(os.Args[1])
 		if err != nil {
@@ -62,6 +58,7 @@ func main() {
 			failrar(err)
 		}
 		defer output_file.Close()
+		defer fmt.Println("Created File: ", output_file.Name())
 
 		// Creates buffered i/o for the files.
 		r = bufio.NewReader(input_file)
@@ -111,6 +108,10 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		failrar(err)
 	}
+
+	// Write the final line of assembly code to end program.
+	fmt.Fprintln(w, s_end_program)
+	w.Flush()
 }
 
 // failrar prints to stderr and exits the program.

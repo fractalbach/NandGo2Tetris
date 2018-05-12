@@ -63,19 +63,18 @@ func WriteArithmetic(command string) string {
 }
 
 // Pushes the value in the D register onto the stack.
-const S_PUSH = `// push d
-@SP
+// Common building block for other commands.
+const PUSHD = `@SP // push d
 M=M+1
 A=M-1
-M=D
-`
+M=D`
 
 // Pops the top element from the stack and places it in register D.
-const S_POP = `// pop d
-@SP
+// Common building block for other commands.
+const POPD = `@SP // pop d
 AM=M-1
 D=M
-`
+M=0`
 
 // Bit-wise NOT on the top element on the stack.
 // Only affects one element.
@@ -116,8 +115,16 @@ M=-M
 // However, the 16-bit ALU we use in the HACK computer can only support
 // certain basic operations.
 //
+const alu_arith_string = `%s
+%s
+A=A-1
+%s
+`
+
+// arithmetic string that supports add, subtract, AND, OR.
+// Usage: (POPD, comment, assembly)
 func alu_arithmetic(comment string, assembly string) string {
-	return S_POP + comment + "\nA=A-1\n" + assembly + "\n"
+	return fmt.Sprintf(alu_arith_string, comment, POPD, assembly)
 }
 
 var (
@@ -139,20 +146,20 @@ var (
 //      JGT   jump if greater than
 //
 const S_INEQ = `%s
-@SP
-AM=M-1
-D=M
+%v 
 A=A-1
 D=M-D
 M=-1
 @LOCATION%d
 D; %s
+@SP
+A=M-1
 M=0
 (LOCATION%d)
 `
 
 func inequality(comment string, assembly string, counter int) string {
-	return fmt.Sprintf(S_INEQ, comment, counter, assembly, counter)
+	return fmt.Sprintf(S_INEQ, comment, POPD, counter, assembly, counter)
 }
 
 func S_JEQ(location int) string {
@@ -176,11 +183,21 @@ func next(count *int) int {
 }
 
 var segment_map = map[string]string{
-	"local": "LCL",
-	"arg":   "ARG",
+	"local":    "LCL",
+	"argument": "ARG",
+	"this":     "THIS",
+	"that":     "THAT",
+	"temp":     "TMP",
+	"pointer":  "pointer",
 }
 
 func (cmd *Command) WritePushPop() string {
+
+	// Constant push commands don't need to go through the
+	// whole process
+	if cmd.Kind == C_PUSH && cmd.Arg1 == "constant" {
+		return constant_push(cmd.Arg2)
+	}
 
 	// retrieve the assembly equivalent of the given segment.
 	// if it can't be found, then you've been given a bad segment.
@@ -204,40 +221,140 @@ func (cmd *Command) WritePushPop() string {
 // Special Push Example.
 // 		Variable Order:
 // 		(string, int, int, string)
-const special_push = `// push %s %d
+const push_thru_pointer = `// push %s %d
 @%d
 D=A
 @%s
-A=A+D
+A=M+D
 D=M
-@SP
-M=M+1
-A=M-1
-M=D
+%v
 `
 
 func push(s string, n int) string {
-	return fmt.Sprintf(special_push, s, n, n, s)
+	if s == "TMP" {
+		return pushTemp(n)
+	}
+	if s == "pointer" {
+		return pushPointer(n)
+	}
+	return fmt.Sprintf(push_thru_pointer, s, n, n, s, PUSHD)
 }
 
 // Special Memory Access Pop Command.
 // 		Variable Order:
 // 		(string, int, int, string)
-const special_pop = `// pop %s %d
+const pop_thru_pointer = `// pop %s %d
 @%d
 D=A
 @%s
-D=A+D
+D=D+M
 @R13
 M=D
-@SP
-AM=M-1
-D=M
+%v
 @R13
 A=M
 M=D
 `
 
 func pop(s string, n int) string {
-	return fmt.Sprintf(special_pop, s, n, n, s)
+	if s == "TMP" {
+		return popTemp(n)
+	}
+	if s == "pointer" {
+		return popPointer(n)
+	}
+	return fmt.Sprintf(pop_thru_pointer, s, n, n, s, POPD)
 }
+
+const s_constant_push = `// push constant %d
+@%d
+D=A
+%v
+`
+
+func constant_push(n int) string {
+	return fmt.Sprintf(s_constant_push, n, n, PUSHD)
+}
+
+const s_end_program = ` // End of Program.
+(END)
+@END
+0; JMP
+`
+
+func pushTemp(n int) string {
+	return fmt.Sprintf(s_push_temp, n, n, PUSHD)
+}
+
+const s_push_temp = `// push temp %d
+@%d
+D=A
+@5
+A=A+D
+D=M
+%v
+`
+
+func popTemp(n int) string {
+	return fmt.Sprintf(s_pop_temp, n, n, POPD)
+}
+
+// Usage:
+// (n, n, POP d, )
+const s_pop_temp = `// pop temp %d
+@%d
+D=A
+@5
+D=A+D
+@R13
+M=D
+%v
+@R13
+A=M
+M=D
+`
+
+func popPointer(n int) string {
+	var x string
+	switch n {
+	case 0:
+		x = s_pop_pointer_0
+	case 1:
+		x = s_pop_pointer_1
+	}
+	return fmt.Sprintf(x, POPD)
+}
+
+func pushPointer(n int) string {
+	var x string
+	switch n {
+	case 0:
+		x = s_push_pointer_0
+	case 1:
+		x = s_push_pointer_1
+	}
+	return fmt.Sprintf(x, PUSHD)
+}
+
+const s_push_pointer_0 = `//push pointer 1
+@THIS
+D=M
+%v
+`
+
+const s_push_pointer_1 = `//push pointer 0
+@THAT
+D=M
+%v
+`
+
+const s_pop_pointer_0 = `// pop pointer 0
+%v
+@THIS
+M=D
+`
+const s_pop_pointer_1 = `// pop pointer 1
+%v
+@THAT
+M=D
+`
