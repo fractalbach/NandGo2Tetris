@@ -2,10 +2,28 @@ package main
 
 import (
 	"fmt"
-	// "github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/stack"
+	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/control"
+	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/pointer"
+	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/stack"
 	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/static"
+	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/temp"
 )
 
+// Segment_map contains a list of acceptable segments,
+// and maps certain segments to the symbol used in assembly.
+var segment_map = map[string]string{
+	"local":    "LCL",
+	"argument": "ARG",
+	"this":     "THIS",
+	"that":     "THAT",
+	"temp":     "TMP",
+	"pointer":  "pointer",
+	"static":   "static",
+}
+
+// Counters is used internally for branching within the assembly code itself.
+// They are used sparingly, and are always called when wrapped around
+// a next(&counter) function.
 var (
 	location_counter = 0
 	static_counter   = 0
@@ -34,28 +52,28 @@ func WriteArithmetic(command string) string {
 	// and always have the same representation in assembly.
 
 	case "add":
-		return S_ADD
+		return stack.ADD
 	case "sub":
-		return S_SUB
+		return stack.SUB
 	case "not":
-		return S_NOT
+		return stack.NOT
 	case "and":
-		return S_AND
+		return stack.AND
 	case "or":
-		return S_OR
+		return stack.OR
 	case "neg":
-		return S_NEG
+		return stack.NEG
 
 	// When comparing inequalities, we need to include jumps.
 	// in order to avoid conflicts of jumps, increment
 	// the location counter by 1 prior to return the string.
 
 	case "eq":
-		return S_JEQ(next(&location_counter))
+		return stack.JEQ(next(&location_counter))
 	case "gt":
-		return S_JGT(next(&location_counter))
+		return stack.JGT(next(&location_counter))
 	case "lt":
-		return S_JLT(next(&location_counter))
+		return stack.JLT(next(&location_counter))
 	}
 
 	// If an invalid command has been given, then it is due to
@@ -63,138 +81,6 @@ func WriteArithmetic(command string) string {
 	// Panic to inform creator of the compiler (that's you!)
 	// that something is wrong.
 	panic("ERROR: INVALID ARITHMETIC COMMAND GIVEN.")
-}
-
-// Pushes the value in the D register onto the stack.
-// Common building block for other commands.
-const PUSHD = `@SP // push d
-M=M+1
-A=M-1
-M=D`
-
-// Pops the top element from the stack and places it in register D.
-// Common building block for other commands.
-const POPD = `@SP // pop d
-AM=M-1
-D=M
-M=0`
-
-// Bit-wise NOT on the top element on the stack.
-// Only affects one element.
-// Does not pop the stack.
-const S_NOT = `// bitwise NOT
-@SP
-A=M-1
-M=!M
-`
-
-// Negation of the top element on the stack.
-// Only affects one element.
-// Does not pop the stack.
-const S_NEG = `// negation
-@SP
-A=M-1
-M=-M
-`
-
-// ALU_arithemtic returns the assembly instructions for stack arithemtic.
-// Supports the basic ALU instructions: add, subtract, and, or.
-// Each of these has a similar structure in assembly.
-//
-// 		1. @SP 		goto register holding the stack pointer
-// 		2. AM=M-1   move top of stack down by 1, then goto top of stack.
-// 		2. D=M 		Save the element at the top of the stack in register D.
-// 		4. A=A-1    Move down 1 element in the stack.
-// 		5. M=M_A	Evaluate arithemtic, replace "_" with an operator.
-// 					and save the result in the current register.
-//
-// This is only meaningful if you have 2 values in the stack.
-// Those 2 values are used together in the arithmetic to form a new value.
-// This new value is also saved on the stack.
-// So the net change in size of stack is -1.
-//
-// Given a different computer architecture, or a different chipset,
-// there could be a wider range of commands that could be translated this way.
-// However, the 16-bit ALU we use in the HACK computer can only support
-// certain basic operations.
-//
-const alu_arith_string = `%s
-%s
-A=A-1
-%s
-`
-
-// arithmetic string that supports add, subtract, AND, OR.
-// Usage: (POPD, comment, assembly)
-func alu_arithmetic(comment string, assembly string) string {
-	return fmt.Sprintf(alu_arith_string, comment, POPD, assembly)
-}
-
-var (
-	S_ADD = alu_arithmetic("// add", "M=M+D")
-	S_SUB = alu_arithmetic("// subtract", "M=M-D")
-	S_AND = alu_arithmetic("// AND", "M=M&D")
-	S_OR  = alu_arithmetic("// OR", "M=M|D")
-)
-
-// INEQUALITY requires similar parameters to the alu_arithmetic,
-// but also requires a name for the "checkpoint" variable.  It does not
-// determine this on it's own, because it may cause conflicts with other
-// jump variables depending on the context.
-//
-// For the assembly parameter, write one of the following:
-//
-// 		JEQ   Jump if equal to
-// 		JLT   Jump if less than
-//      JGT   jump if greater than
-//
-const S_INEQ = `%s
-%v 
-A=A-1
-D=M-D
-M=-1
-@LOCATION%d
-D; %s
-@SP
-A=M-1
-M=0
-(LOCATION%d)
-`
-
-func inequality(comment string, assembly string, counter int) string {
-	return fmt.Sprintf(S_INEQ, comment, POPD, counter, assembly, counter)
-}
-
-func S_JEQ(location int) string {
-	return inequality("// true if x = y, else false", "JEQ", location)
-}
-
-func S_JLT(location int) string {
-	return inequality("// true if x < y, else false", "JLT", location)
-}
-
-func S_JGT(location int) string {
-	return inequality("// true if x > y, else false", "JGT", location)
-}
-
-// next accepts a pointer to an integer, increments it,
-// and then returns its new value.  The incremented value
-// will be saved in it's original variable.
-func next(count *int) int {
-	*count++
-	return *count
-}
-
-// Segment_map contains a list of acceptable segments,
-// and maps certain segments to the symbol used in assembly.
-var segment_map = map[string]string{
-	"local":    "LCL",
-	"argument": "ARG",
-	"this":     "THIS",
-	"that":     "THAT",
-	"temp":     "TMP",
-	"pointer":  "pointer",
-	"static":   "static",
 }
 
 func (cmd *Command) WritePushPop() string {
@@ -212,6 +98,7 @@ func (cmd *Command) WritePushPop() string {
 		return ""
 	}
 
+	// Decide between Push or Pop.
 	switch cmd.Kind {
 	case C_POP:
 		return pop(segment, cmd.Arg2)
@@ -224,156 +111,118 @@ func (cmd *Command) WritePushPop() string {
 	panic("Invalid push/pop command.")
 }
 
-// Special Push Example.
-// 		Variable Order:
-// 		(string, int, int, string)
-const push_thru_pointer = `// push %s %d
-@%d
-D=A
-@%s
-A=M+D
-D=M
-%v
-`
-
+// push accepts a segment and index from a push command.
+// returns the string containing assembly instructions,
+// A value will be copied from memory based on the given
+// segment and index.  That value is then pushed to the
+// global stack.
 func push(s string, n int) string {
 	switch s {
 	case "TMP":
-		return pushTemp(n)
-
+		return temp.Push(n)
 	case "pointer":
-		return pushPointer(n)
-
+		return pointer.Push(n)
 	case "static":
 		return static.Push(current_filename, n)
+	case "LCL", "ARG":
+		return pointer.PushThrough(s, n)
 	}
-	return fmt.Sprintf(push_thru_pointer, s, n, n, s, PUSHD)
+	return "// [ERROR] "
 }
 
-// Special Memory Access Pop Command.
-// 		Variable Order:
-// 		(string, int, int, string)
-const pop_thru_pointer = `// pop %s %d
-@%d
-D=A
-@%s
-D=D+M
-@R13
-M=D
-%v
-@R13
-A=M
-M=D
-`
-
 // pop accepts the segment and index from a pop command.
-// returns the string containing assembly instructions.
-//
-// Based on the segment, a different function is used to
-// determine which function is returned.
+// returns string containing assembly instructions
+// that will pop a value from the stack, and place it
+// somewhere in memory based on the given segment and index.
 func pop(s string, n int) string {
 	switch s {
 	case "TMP":
-		return popTemp(n)
+		return temp.Pop(n)
 
 	case "pointer":
-		return popPointer(n)
+		return pointer.Pop(n)
 
 	case "static":
 		return static.Pop(current_filename, n)
+
+	case "LCL", "ARG":
+		return pointer.PopThrough(s, n)
 	}
-	return fmt.Sprintf(pop_thru_pointer, s, n, n, s, POPD)
+	return "// [ERROR]"
 }
 
-const s_constant_push = `// push constant %d
-@%d
-D=A
-%v
-`
-
-func constant_push(n int) string {
-	return fmt.Sprintf(s_constant_push, n, n, PUSHD)
-}
-
+// The end of program is an infinite loop that will unconditionally
+// jump back to itself.  This only happens once, and is only found
+// at the very end of the .asm file.
 const s_end_program = ` // End of Program.
 (END)
 @END
 0; JMP
 `
 
-func pushTemp(n int) string {
-	return fmt.Sprintf(s_push_temp, n, n, PUSHD)
-}
-
-const s_push_temp = `// push temp %d
+// The constant push is a simple integer value.
+const s_constant_push = `// push constant %d
 @%d
 D=A
-@5
-A=A+D
-D=M
 %v
 `
 
-func popTemp(n int) string {
-	return fmt.Sprintf(s_pop_temp, n, n, POPD)
+// pushes a constant value to the stack.
+func constant_push(n int) string {
+	return fmt.Sprintf(s_constant_push, n, n, stack.PUSHD)
 }
 
-// Usage:
-// (n, n, POP d, )
-const s_pop_temp = `// pop temp %d
-@%d
+// next accepts a pointer to an integer, increments it,
+// and then returns its new value.  The incremented value
+// will be saved in it's original variable.
+func next(count *int) int {
+	*count++
+	return *count
+}
+
+const s_init = `// bootstrap code
+// ---------------
+// set SP = 256
+@256
 D=A
-@5
-D=A+D
-@R13
+@SP
 M=D
-%v
-@R13
-A=M
+
+// set LCL = 300
+// MIGHT NOT NEED THIS PART
+//
+@300
+D=A
+@LCL
 M=D
+
+// Start executing sys.init
+// call Sys.init
+// ---------------
 `
 
-func popPointer(n int) string {
-	var x string
-	switch n {
-	case 0:
-		x = s_pop_pointer_0
-	case 1:
-		x = s_pop_pointer_1
-	}
-	return fmt.Sprintf(x, POPD)
+func WriteInit() string {
+	return s_init
 }
 
-func pushPointer(n int) string {
-	var x string
-	switch n {
-	case 0:
-		x = s_push_pointer_0
-	case 1:
-		x = s_push_pointer_1
+func (cmd *Command) WriteProgramControl() (string, error) {
+	switch cmd.Kind {
+	case C_LABEL:
+		return control.WriteLabel(cmd.Arg1), nil
+	case C_IF:
+		return control.WriteIf(cmd.Arg1), nil
+	case C_GOTO:
+		return control.WriteGoto(cmd.Arg1), nil
+	case C_FUNCTION:
+		return "", errNotImplemented("function")
+	case C_RETURN:
+		return "", errNotImplemented("return")
+	case C_CALL:
+		return "", errNotImplemented("call")
 	}
-	return fmt.Sprintf(x, PUSHD)
+	panic("This command should not be writing a program control.")
 }
 
-const s_push_pointer_0 = `//push pointer 1
-@THIS
-D=M
-%v
-`
-
-const s_push_pointer_1 = `//push pointer 0
-@THAT
-D=M
-%v
-`
-
-const s_pop_pointer_0 = `// pop pointer 0
-%v
-@THIS
-M=D
-`
-const s_pop_pointer_1 = `// pop pointer 1
-%v
-@THAT
-M=D
-`
+func errNotImplemented(s string) error {
+	return fmt.Errorf("%s hasn't been implemented yet.", s)
+}

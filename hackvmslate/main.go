@@ -92,7 +92,7 @@ func main() {
 		// Check for any errors and loudly report them.
 		s, err := ParseLine(scanner.Text())
 		if err != nil {
-			failrar("Line:", source_line_count, err)
+			failrar("Line", source_line_count, ":", err)
 		}
 
 		// Skip past empty strings.

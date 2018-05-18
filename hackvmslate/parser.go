@@ -31,6 +31,14 @@ const (
 	C_PUSH = iota
 	C_POP  = iota
 	C_THIS = iota
+
+	//Program Control commmands
+	C_LABEL    = iota
+	C_IF       = iota
+	C_GOTO     = iota
+	C_FUNCTION = iota
+	C_RETURN   = iota
+	C_CALL     = iota
 )
 
 type Command struct {
@@ -92,6 +100,9 @@ func getCommandFromLine(line string) (string, error) {
 
 	case C_POP, C_PUSH:
 		return cmd.WritePushPop(), nil
+
+	case C_LABEL, C_IF, C_GOTO, C_FUNCTION, C_RETURN, C_CALL:
+		return cmd.WriteProgramControl()
 	}
 
 	// Convert into a string.
@@ -106,6 +117,7 @@ func getCommandFromLine(line string) (string, error) {
 // by the codewriter to make assembly code.
 func getCommandFromFields(fields []string) (*Command, error) {
 	cmd := Command{}
+	var err error
 	switch fields[0] {
 
 	// Arithemtic commands are simple 1 word commands.
@@ -115,17 +127,53 @@ func getCommandFromFields(fields []string) (*Command, error) {
 		cmd.Kind = C_ARITHMETIC
 		cmd.Arg1 = fields[0]
 
+	case "label":
+		cmd.Kind = C_LABEL
+		cmd.Arg1 = fields[1]
+
+	case "goto":
+		cmd.Kind = C_GOTO
+		cmd.Arg1 = fields[1]
+
+	case "if-goto":
+		cmd.Kind = C_IF
+		if len(fields) != 1 {
+
+		}
+		cmd.Arg1 = fields[1]
+
+	case "function":
+		if len(fields) != 3 {
+			err = errWrongArguments("function", 3, len(fields)-1)
+			break
+		}
+		cmd.Kind = C_FUNCTION
+		cmd.Arg1 = fields[1]
+		cmd.Arg2, err = strconv.Atoi(fields[2])
+
+	case "return":
+		cmd.Kind = C_RETURN
+
+	case "call":
+		if len(fields) != 3 {
+			err = errWrongArguments("call", 3, len(fields)-1)
+			break
+		}
+		cmd.Kind = C_CALL
+		cmd.Arg1 = fields[1]
+		cmd.Arg2, err = strconv.Atoi(fields[2])
+
 	// Push and Pop are memory access commands.
 	// Values can be pushed/popped from/to different places.
 	// Arg1 is a string defining the location in memory.
 	// Arg2 is a integer defining offset from location.
 	case "push":
 		cmd.Kind = C_PUSH
-		cmd.addPushPopArgs(fields)
+		err = cmd.addPushPopArgs(fields)
 
 	case "pop":
 		cmd.Kind = C_POP
-		cmd.addPushPopArgs(fields)
+		err = cmd.addPushPopArgs(fields)
 
 	// If the command doesn't fit any of the cases,
 	// then it is not a command the parser understands, which
@@ -133,7 +181,7 @@ func getCommandFromFields(fields []string) (*Command, error) {
 	default:
 		return &cmd, fmt.Errorf("Invalid command kind: %v", fields)
 	}
-	return &cmd, nil
+	return &cmd, err
 }
 
 // addPushPopArgs takes the fields of a source command, and
@@ -143,7 +191,7 @@ func (cmd *Command) addPushPopArgs(fields []string) error {
 
 	// Confirm there are the correct number of arguments.
 	if len(fields) != 3 {
-		return fmt.Errorf("Invalid number of arguments: %v", fields)
+		return errWrongArguments("push/pop", 2, len(fields)-1)
 	}
 
 	// The first argument is a string.  Pass it directly.
@@ -160,4 +208,8 @@ func (cmd *Command) addPushPopArgs(fields []string) error {
 
 	// No errors!  Arguments have succesfully been added!
 	return nil
+}
+
+func errWrongArguments(name string, expects, got int) error {
+	return fmt.Errorf("Invalid number of arguments for %s command. Expects:(%d), Got:(%d).", name, expects, got)
 }
