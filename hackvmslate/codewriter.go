@@ -7,6 +7,7 @@ import (
 	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/stack"
 	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/static"
 	"github.com/fractalbach/nandGo2tetris/hackvmslate/codewriter/temp"
+	"strconv"
 )
 
 // Segment_map contains a list of acceptable segments,
@@ -24,10 +25,15 @@ var segment_map = map[string]string{
 // Counters is used internally for branching within the assembly code itself.
 // They are used sparingly, and are always called when wrapped around
 // a next(&counter) function.
+const (
+	default_current_function = "NullFunction"
+)
+
 var (
 	location_counter = 0
 	static_counter   = 0
 	return_counter   = 0
+	current_function = default_current_function
 )
 
 // WriteArithemtic accepts an arithemtic command and returns the
@@ -180,40 +186,39 @@ func next(count *int) int {
 	return *count
 }
 
-const s_init = `// bootstrap code
-// ---------------
-// set SP = 256
+func WriteInit() string {
+	return `// bootstrap code
+// ----------------------------------
+// set stack pointer to 256
 @256
 D=A
 @SP
 M=D
-
-// Start executing sys.init
-// call Sys.init
-// ---------------
+` + WriteCall("sys.init", 0) + `
+// ----------------------------------
 `
-
-func WriteInit() string {
-	return s_init
 }
 
 func (cmd *Command) WriteProgramControl() (string, error) {
 	switch cmd.Kind {
 	case C_LABEL:
-		return control.WriteLabel(cmd.Arg1), nil
+		return control.WriteLabel(current_function + "$" + cmd.Arg1), nil
+
 	case C_IF:
-		return control.WriteIf(cmd.Arg1), nil
+		return control.WriteIf(current_function + "$" + cmd.Arg1), nil
 
 	case C_GOTO:
-		return control.WriteGoto(cmd.Arg1), nil
+		return control.WriteGoto(current_function + "$" + cmd.Arg1), nil
 
 	case C_FUNCTION:
 		if cmd.Arg2 < 0 {
 			return "", fmt.Errorf("Can't have a function with %d local variables! That doesn't make sense!", cmd.Arg2)
 		}
+		current_function = cmd.Arg1
 		return WriteFunction(cmd.Arg1, cmd.Arg2), nil
 
 	case C_RETURN:
+		current_function = default_current_function
 		return s_return, nil
 
 	case C_CALL:
@@ -272,7 +277,7 @@ M=D
 
 func WriteCall(name string, nArgs int) string {
 	id := next(&return_counter)
-	ret := name + "." + string(id)
+	ret := name + "." + strconv.Itoa(id)
 	return fmt.Sprintf(s_call, name, nArgs, ret, nArgs, name, ret)
 }
 
