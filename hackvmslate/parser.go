@@ -99,7 +99,7 @@ func getCommandFromLine(line string) (string, error) {
 		return WriteArithmetic(cmd.Arg1), nil
 
 	case C_POP, C_PUSH:
-		return cmd.WritePushPop(), nil
+		return cmd.WritePushPop()
 
 	case C_LABEL, C_IF, C_GOTO, C_FUNCTION, C_RETURN, C_CALL:
 		return cmd.WriteProgramControl()
