@@ -7,6 +7,7 @@ const (
 	INT_CONST    = "integer"
 	STRING_CONST = "string"
 	UNKNOWN      = "?"
+	INVALID      = "!INVALID!"
 )
 
 // The symbols are single character "runes".

@@ -1,7 +1,10 @@
 package JackTokenizer
 
 import (
+	"fmt"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackGrammar"
+	"strconv"
+	"unicode"
 )
 
 type tokenSplitter struct {
@@ -99,6 +102,9 @@ func (t *tokenSplitter) push(kind string) {
 	if t.buf == "" {
 		return
 	}
+	if kind == JackGrammar.UNKNOWN {
+		kind = resolveUnknownToken(t.buf)
+	}
 	tok := token{kind: kind, content: t.buf}
 	t.arr = append(t.arr, tok)
 	t.buf = ""
@@ -118,6 +124,66 @@ func (t *tokenSplitter) add2buf(r rune) {
 	t.buf += string(r)
 }
 
-func (t *tokenSplitter) resolveUnknownTokens() {
+// ResolveUnknownToken accepts the content of a single token,
+// and Checks (in this order) if the given token is a...
+// 		- Symbol
+// 		- Keyword
+//		- Constant integer.
+// 		- Valid identifier
+// Otherwise, there is something wrong with the content, and it is
+// becomes an INVALID token.
+//
+// We assume that constant strings have been taken care of,
+// because they can't be determined by just looking at the content,
+// since the tokenizer process removes the quotation marks.
+//
+func resolveUnknownToken(content string) string {
 
+	// preliminary check for empty string.
+	if len(content) <= 0 {
+		return JackGrammar.INVALID
+	}
+
+	// Symbol?
+	if len(content) == 1 {
+		for _, token := range JackGrammar.LIST_OF_SYMBOLS {
+			if content == string(token) {
+				return JackGrammar.SYMBOL
+			}
+		}
+	}
+
+	// Keyword?
+	for _, keyword := range JackGrammar.LIST_OF_KEYWORDS {
+		if content == keyword {
+			return JackGrammar.KEYWORD
+		}
+	}
+
+	// Constant Integer?
+	_, validInteger := strconv.Atoi(content)
+	if validInteger == nil {
+		return JackGrammar.INT_CONST
+	}
+
+	// Valid Identifier?
+	// check for a leading digit, which would be invalid.
+	if !unicode.IsLetter(rune(content[0])) {
+		syntax(content, "identifier cant have a leading digit.")
+		return JackGrammar.INVALID
+	}
+	// check each rune to se if each is either a letter, digit, or underscore.
+	for _, r := range content {
+		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_') {
+			syntax(content, "This is not a letter, digit, or underscore: "+string(r))
+			return JackGrammar.INVALID
+		}
+	}
+	return JackGrammar.IDENTIFIER
+}
+
+var loud = "SYNTAX ERROR: "
+
+func syntax(s string, s2 string) {
+	fmt.Println(loud+"("+s+"): ", s2)
 }
