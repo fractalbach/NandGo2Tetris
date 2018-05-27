@@ -1,7 +1,6 @@
 package JackTokenizer
 
 import (
-	"fmt"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackGrammar"
 	"strconv"
 	"unicode"
@@ -169,21 +168,13 @@ func resolveUnknownToken(content string) string {
 	// Valid Identifier?
 	// check for a leading digit, which would be invalid.
 	if !unicode.IsLetter(rune(content[0])) {
-		syntax(content, "identifier cant have a leading digit.")
 		return JackGrammar.INVALID
 	}
 	// check each rune to se if each is either a letter, digit, or underscore.
 	for _, r := range content {
 		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_') {
-			syntax(content, "This is not a letter, digit, or underscore: "+string(r))
 			return JackGrammar.INVALID
 		}
 	}
 	return JackGrammar.IDENTIFIER
-}
-
-var loud = "SYNTAX ERROR: "
-
-func syntax(s string, s2 string) {
-	fmt.Println(loud+"("+s+"): ", s2)
 }
