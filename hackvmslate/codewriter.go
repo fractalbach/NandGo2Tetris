@@ -218,7 +218,6 @@ func (cmd *Command) WriteProgramControl() (string, error) {
 		return WriteFunction(cmd.Arg1, cmd.Arg2), nil
 
 	case C_RETURN:
-		current_function = default_current_function
 		return s_return, nil
 
 	case C_CALL:
@@ -244,33 +243,33 @@ func (cmd *Command) WriteFunction() (string, error) {
 // - name
 // - nArgs
 // - return label
-// - nArgs
+// - nArgs + 5
 // - name
 // - return label
 const s_call = ` // call %s %d 
-@RETURN.%s
+@RETURN.%s 	// push return address.
 D=A
 ` + stack.PUSHD + `
-@LCL
+@LCL		// push local
 D=M
 ` + stack.PUSHD + `
-@ARG
+@ARG		// push arg
 D=M
 ` + stack.PUSHD + `
-@THIS
+@THIS		// push this
 D=M
 ` + stack.PUSHD + `
-@%d
+@%d	 		// set D = (SP - (nArgs + 5))
 D=A
-@SP
-D=D-A
-@ARG
+@SP 	
+D=M-D
+@ARG 		// set ARG = D
 M=D
-@SP
+@SP 		// set LCL = SP
 D=M
 @LCL
 M=D
-@FUNCTION.%s
+@FUNCTION.%s 	// goto f
 0; JMP
 (RETURN.%s)
 `
@@ -278,7 +277,7 @@ M=D
 func WriteCall(name string, nArgs int) string {
 	id := next(&return_counter)
 	ret := name + "." + strconv.Itoa(id)
-	return fmt.Sprintf(s_call, name, nArgs, ret, nArgs, name, ret)
+	return fmt.Sprintf(s_call, name, nArgs, ret, nArgs+5, name, ret)
 }
 
 func WriteFunction(name string, nLocal int) string {
@@ -299,22 +298,28 @@ M=0
 `
 
 const s_return = `// return
+@LCL 	// set FRAME = LCL
+D=M
+@FRAME  
+M=D	
+// @5		// set RET = *(FRAME - 5)
+// D=D-A 	// set D = (FRAME - 5)
+// A=D 	// Follow pointer *(FRAME-5)
+// D=M 	// set D = *(FRAME-5)
+// @RET 	// set RET = *(FRAME - 5)	
+// M=D
 ` + stack.POPD + `
 @ARG 	// places return value in the right spot.
-A=M
-M=D
-@ARG	// restores stack pointer.  SP <- ARG + 1
+A=M		// goto *(ARG)
+M=D 	// set *ARG = pop()
+@ARG	// restores stack pointer.  SP = ARG + 1
 D=M
 @SP
 M=D+1
-@LCL 	// init frame pointer
-D=M
-@FRAME
-M=D
 ` + s_POP_FRAME + `
 @THAT 	// restore that.
 M=D
-` + s_POP_FRAME + `
+` + s_POP_FRAME + `	
 @THIS	// restore this.
 M=D
 ` + s_POP_FRAME + `
@@ -324,8 +329,8 @@ M=D
 @LCL 	// restore local.
 M=D
 ` + s_POP_FRAME + `
-A=D 	// jumps to return address.
-0;JMP
+A=D
+0; JMP
 `
 
 const s_POP_FRAME = `@FRAME

@@ -113,7 +113,7 @@ func main() {
 	}
 
 	// Write the final line of assembly code to end program.
-	fmt.Fprintln(w, s_end_program)
+	// fmt.Fprintln(w, s_end_program)
 }
 
 // failrar prints to stderr and exits the program.
