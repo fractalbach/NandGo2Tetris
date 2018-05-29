@@ -8,6 +8,21 @@ Having a list of keywords is also useful for the tokenizer.
 Prior to analysis, a string could be a constant string, an identifier, or a keyword.
 Until checking the list of keywords, it could be anything.
 
+
+Syntax
+
+In addition to lists, this JackGrammar package also includes some helper
+functions.  The purpose of these is to check whether or not a string
+matches a certain syntatic element.  An example is the function:
+	IsSubroutineDec(string) bool
+which checks to see if the given string (which should be the content
+of a token), is a Subroutine Declaration.  If this were a more advanced
+and practical parser, it would also check additional tokens beyond
+the first keyword.
+
+
+Extra Constants
+
 Additional constants that are not included in the Jack Grammar
 have been added to this package for usage by the tokenizer and parser.
 Specifically, those are UNKNOWN, INVALID, and TERMINAL.
