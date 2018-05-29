@@ -11,16 +11,17 @@ import (
 )
 
 type engine struct {
-	jt JackTokenizer.TokenIterator
-	w  io.Writer
+	i JackTokenizer.TokenIterator
+	w io.Writer
 }
 
-func tag(s string) string {
-	return fmt.Sprintf("<%s>", s)
-}
-
-func endtag(s string) string {
-	return fmt.Sprintf("</%s>", s)
+func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator) {
+	e := engine{
+		i: tokenizer,
+		w: w,
+	}
+	tree := e.CompileClass()
+	fmt.Fprintln(w, tree)
 }
 
 func (e *engine) tag(s string) {
@@ -36,19 +37,11 @@ func (e *engine) println(a ...interface{}) {
 }
 
 func (e *engine) printCurrentToken() {
-	e.println(e.jt.Current())
+	e.println(e.i.Current())
 }
 
 func (e *engine) Write(p []byte) (int, error) {
 	return e.w.Write(p)
-}
-
-func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator) {
-	e := engine{
-		jt: tokenizer,
-		w:  w,
-	}
-	e.CompileClass()
 }
 
 // Class:  'class' className '{' classVarDec* subroutineDec* '}'
@@ -67,32 +60,56 @@ func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator) {
 		symbol (terminal)
 
 */
-func (e *engine) CompileClass() {
+func (e *engine) compileClass() {
+
 	e.tag("class")
 	// advance to class name.
-	e.jt.Advance()
+	e.i.Advance()
 
 	e.tag("className")
 	e.printCurrentToken()
 	e.endtag("className")
 	// advance to '{'
-	e.jt.Advance()
+	e.i.Advance()
 	e.printCurrentToken()
 	// the next advance could end up at any of the following:
 	// classVarDec* | subroutineDec* | '}',
 	// it depends on what is given as input.
-	e.jt.Advance()
+	e.i.Advance()
 	// classVarDec*
-	for JackGrammar.IsClassVarDec(e.jt.Current().Content()) {
+	for JackGrammar.IsClassVarDec(e.i.Current().Content()) {
 		e.CompileClassVarDec()
 	}
 	// subroutineDec*
-	for JackGrammar.IsSubroutineDec(e.jt.Current().Content()) {
+	for JackGrammar.IsSubroutineDec(e.i.Current().Content()) {
 		e.CompileSubroutineDec()
 	}
 	// '}'
 	e.printCurrentToken()
 	e.endtag("class")
+}
+
+// CompileClass is the first function that is called by Run(), so it
+// creates and returns the Parse Tree.  All other compile methods are
+// called from CompileClass().
+func (e *engine) CompileClass() ParseTree.ParseTree {
+	t := ParseTree.NewParseTree("class")
+	t.Leaf(e.i.Current()) // keyword 'class'
+	e.i.Advance()
+	t.Leaf(e.i.Current()) // identifier className
+	e.i.Advance()
+	t.Leaf(e.i.Current()) // symbol {
+	e.i.Advance()
+	// closure:  (classVarDec)*
+	for JackGrammar.IsClassVarDec(e.i.Current().Content()) {
+		e.CompileClassVarDec()
+	}
+	// closure: (subroutineDec)*
+	for JackGrammar.IsSubroutineDec(e.i.Current().Content()) {
+		e.CompileSubroutineDec()
+	}
+	t.Leaf(e.i.Current()) // symbol }
+	return t
 }
 
 // ClassVarDec = ('static' | 'field')
@@ -104,4 +121,12 @@ func (e *engine) CompileClassVarDec() {
 
 func (e *engine) CompileSubroutineDec() {
 
+}
+
+func tag(s string) string {
+	return fmt.Sprintf("<%s>", s)
+}
+
+func endtag(s string) string {
+	return fmt.Sprintf("</%s>", s)
 }

@@ -109,7 +109,7 @@ and all leaf nodes attached to it.
 */
 func (n *node) String() string {
 	if n.kind == terminal {
-		return fmt.Sprint(n.token)
+		return fmt.Sprintln(n.token)
 	}
 	s := tag(n.kind) + "\n"
 	for _, v := range n.leaves {
