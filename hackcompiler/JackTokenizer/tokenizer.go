@@ -2,40 +2,65 @@ package JackTokenizer
 
 import (
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackGrammar"
+	"github.com/fractalbach/nandGo2tetris/hackcompiler/Token"
 	"strconv"
 	"unicode"
 )
 
 type tokenSplitter struct {
-	arr         []token
+	arr         []Token.Token
 	buf         string
 	string_mode bool
 }
 
-func tokenize(s string) []token {
+func tokenize(s string) []Token.Token {
 
 	symbols := JackGrammar.LIST_OF_SYMBOLS
 	t := new(tokenSplitter)
 	t.string_mode = false
 	skip := false
 	comment_mode := false
+	extended_comment_mode := false
+	exiting_extended_comment_mode := false
 
 	for i, r := range s {
+
+		if exiting_extended_comment_mode {
+			if r == '/' {
+				exiting_extended_comment_mode = false
+				extended_comment_mode = false
+			}
+			continue
+		}
 
 		// Check for comments.
 		// 1. Check if current character is /
 		// 2. If it is, make sure we aren't at the end of file.
 		// 3. Look ahead 1 character to see if there is another /
 		// If we confirm that there is a // present, then enter comment mode.
-		if r == '/' && i+1 < len(s) && s[i+1] == '/' {
-			t.buf = ""
-			comment_mode = true
+		if r == '/' && i+1 < len(s) {
+			// regular comment mode.
+			if s[i+1] == '/' {
+				t.buf = ""
+				comment_mode = true
+			}
+			// extended comment mode.
+			if s[i+1] == '*' {
+				t.buf = ""
+				extended_comment_mode = true
+			}
 		}
 
 		// If we are in comment mode, ignore all characters until endline.
 		if comment_mode {
 			if r == '\n' {
 				comment_mode = false
+			}
+			continue
+		}
+		if extended_comment_mode {
+			if r == '*' && i+1 < len(s) && s[i+1] == '/' {
+				exiting_extended_comment_mode = true
 			}
 			continue
 		}
@@ -90,7 +115,6 @@ func tokenize(s string) []token {
 			t.add2buf(r)
 		}
 	}
-
 	return t.arr
 }
 
@@ -104,7 +128,7 @@ func (t *tokenSplitter) push(kind string) {
 	if kind == JackGrammar.UNKNOWN {
 		kind = resolveUnknownToken(t.buf)
 	}
-	tok := token{kind: kind, content: t.buf}
+	tok := Token.NewToken(kind, t.buf)
 	t.arr = append(t.arr, tok)
 	t.buf = ""
 }

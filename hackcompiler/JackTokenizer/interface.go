@@ -1,6 +1,7 @@
 package JackTokenizer
 
 import (
+	"github.com/fractalbach/nandGo2tetris/hackcompiler/Token"
 	"io"
 	"io/ioutil"
 )
@@ -11,14 +12,7 @@ import (
 type TokenIterator interface {
 	HasMoreTokens() bool
 	Advance()
-	Current() Token
-}
-
-// Token has a kind and content, the different kinds are
-// keyword, symbol, identifier, int_const, string_const"
-type Token interface {
-	Kind() string
-	Content() string
+	Current() Token.Token
 }
 
 // NewTokenIterator takes a reader (which should contain the source code), and returns

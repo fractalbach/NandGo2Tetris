@@ -1,3 +1,22 @@
+/*
+package JackGrammar contains definitions for the Jack programming language.
+
+The JackTokenizer uses this grammar to identify the kinds of tokens and symbols
+that exist.  The List of symbols is useful as possible delimiters when
+splitting the source code by token.
+Having a list of keywords is also useful for the tokenizer.
+Prior to analysis, a string could be a constant string, an identifier, or a keyword.
+Until checking the list of keywords, it could be anything.
+
+Additional constants that are not included in the Jack Grammar
+have been added to this package for usage by the tokenizer and parser.
+Specifically, those are UNKNOWN, INVALID, and TERMINAL.
+
+Normally, all the constants here would be enumerated, but for
+the sake of simplicity of this project, they are treated as constant strings.
+The abstraction of naming them here, as variables, would allow for an easy
+conversion to enumerated variables.
+*/
 package JackGrammar
 
 const (
@@ -8,6 +27,7 @@ const (
 	STRING_CONST = "string"
 	UNKNOWN      = "?"
 	INVALID      = "!INVALID!"
+	TERMINAL     = "terminal"
 )
 
 // The symbols are single character "runes".
@@ -43,4 +63,22 @@ var LIST_OF_KEYWORDS = []string{
 	"false",
 	"null",
 	"this",
+}
+
+var classVarDec = map[string]bool{
+	"constructor": true,
+	"function":    true,
+	"method":      true,
+}
+
+func IsClassVarDec(s string) bool {
+	out := classVarDec[s]
+	return out
+}
+
+func IsSubroutineDec(s string) bool {
+	if s == "static" || s == "field" {
+		return true
+	}
+	return false
 }
