@@ -56,6 +56,7 @@ type node struct {
 	parent *node
 	leaves []*node
 	token  Token.Token
+	depth  int
 }
 
 // Root returns the interface of the root node in the parse tree.
@@ -78,6 +79,7 @@ func (n *node) Leaf(token Token.Token) ParseTree {
 		root:   n.root,
 		parent: n,
 		token:  token,
+		depth:  n.depth + 1,
 	}
 	n.leaves = append(n.leaves, new_node)
 	return n
@@ -91,6 +93,7 @@ func (n *node) Branch(name string) ParseTree {
 		root:   n.root,
 		parent: n,
 		token:  nil,
+		depth:  n.depth + 1,
 	}
 	n.leaves = append(n.leaves, new_node)
 	return new_node
@@ -109,13 +112,13 @@ and all leaf nodes attached to it.
 */
 func (n *node) String() string {
 	if n.kind == terminal {
-		return fmt.Sprintln(n.token)
+		return spaces(n.depth) + fmt.Sprintln(n.token)
 	}
-	s := tag(n.kind) + "\n"
+	s := spaces(n.depth) + tag(n.kind) + "\n"
 	for _, v := range n.leaves {
 		s += v.String()
 	}
-	s += endtag(n.kind) + "\n"
+	s += spaces(n.depth) + endtag(n.kind) + "\n"
 	return s
 }
 
@@ -125,4 +128,12 @@ func tag(s string) string {
 
 func endtag(s string) string {
 	return fmt.Sprintf("</%s>", s)
+}
+
+func spaces(n int) string {
+	s := ""
+	for i := 0; i < n; i++ {
+		s += "\t"
+	}
+	return s
 }

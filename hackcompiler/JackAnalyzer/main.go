@@ -13,6 +13,15 @@ import (
 var example = `
 // Example to test the CompileClass() command
 class DerpClass {
+	static int x;
+	static int y;
+	field string s;
+	field bool b;
+
+	function void derp() {
+		
+	}
+
 }
 
 `
@@ -23,8 +32,8 @@ USAGE:         JackAnalyzer <filename> [option]
 FILENAME:      Use '-e' to use an example instead of a file.
 
 OPTIONS:
--d, --debug    prints line number, token kind, and token content.
--p, --parse    Activate Parser: [CURRENTLY UNDER CONSTRUCTION].
+-t, --token    prints tokenizer output; does not parse.
+-p, --parse    Activate Parser.
 -x, --xml      Print tokens as XML, split by line.
 `
 
@@ -80,7 +89,7 @@ func handle(filename, option string) {
 		r = ReadFullFile(filename)
 	}
 	switch option {
-	case "-d", "--debug":
+	case "-t", "--token":
 		DebugTokens(r)
 	case "-x", "--xml":
 		TokensXML(r)

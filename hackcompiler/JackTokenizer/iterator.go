@@ -21,7 +21,7 @@ func (ti *tokenIterator) Advance() {
 		ti.current_token_index++
 		return
 	}
-	panic("Tried to Advance to the next token, but the Token Iterator has already reached it's last token.")
+	// panic("Tried to Advance to the next token, but the Token Iterator has already reached it's last token.")
 }
 
 func (ti *tokenIterator) Current() Token.Token {
@@ -32,7 +32,7 @@ func (ti *tokenIterator) HasMoreTokens() bool {
 	if len(ti.token_list) <= 0 {
 		return false
 	}
-	if ti.current_token_index < len(ti.token_list) && ti.current_token_index >= 0 {
+	if ti.current_token_index < len(ti.token_list) {
 		return true
 	}
 	return false

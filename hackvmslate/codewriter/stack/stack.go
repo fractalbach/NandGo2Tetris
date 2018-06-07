@@ -22,8 +22,7 @@ M=D`
 // Common building block for other commands.
 const POPD = `@SP // pop d
 AM=M-1
-D=M
-M=0`
+D=M`
 
 // Bit-wise NOT on the top element on the stack.
 // Only affects one element.
