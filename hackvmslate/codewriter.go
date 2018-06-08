@@ -250,26 +250,29 @@ const s_call = ` // call %s %d
 @RETURN.%s 	// push return address.
 D=A
 ` + stack.PUSHD + `
-@LCL		// push local
+@LCL // push local
 D=M
 ` + stack.PUSHD + `
-@ARG		// push arg
+@ARG   // push arg
 D=M
 ` + stack.PUSHD + `
-@THIS		// push this
+@THIS  // push this
 D=M
 ` + stack.PUSHD + `
-@%d	 		// set D = (SP - (nArgs + 5))
+@THAT  // push that
+D=M
+` + stack.PUSHD + `
+@%d	   // set D = (SP - (nArgs + 5))
 D=A
 @SP 	
 D=M-D
-@ARG 		// set ARG = D
+@ARG   // set ARG = D
 M=D
-@SP 		// set LCL = SP
+@SP    // set LCL = SP
 D=M
 @LCL
 M=D
-@FUNCTION.%s 	// goto f
+@FUNCTION.%s  // goto f
 0; JMP
 (RETURN.%s)
 `
