@@ -24,12 +24,12 @@ class DerpClass {
 `
 
 const help_message = `
-JackAnalyzer, a Compiler for Jack Programs in Nand2Tetris.
+Compiles Jack code into Hack Programs for Nand2Tetris.
 
-USAGE:         JackAnalyzer (<filename>|-wd) [option]
+USAGE:         hackcompiler (<filename>|-wd) [option]
 
-FILENAME FLAGS:
--wd            Uses all .jack files in the working directory.
+FILENAME FLAG:
+-wd            Uses all .hack files from the working directory.
 
 OPTIONS:
 -t, --token    prints tokenizer output to stdout.
@@ -37,10 +37,17 @@ OPTIONS:
 -x, --xml      Print tokens as XML, split by line.
 
 HOW TO USE:
-    Use "-wd" in place of the filename argument to iterate
-    through each file in the working directory to use as input.
-    Each input file creates one output file of the same name.
+Use "-wd" in place of the filename argument to iterate
+through each file in the working directory to use as input.
+Each input file creates one output file of the same name.
 `
+
+const (
+	mode_default      = iota
+	mode_tokens_debug = iota
+	mode_tokens_xml   = iota
+	mode_parse_debug  = iota
+)
 
 func DebugParse(w io.Writer, r io.Reader) {
 	tokenizer := JackTokenizer.Create(r)
@@ -80,28 +87,29 @@ func ReadFullFile(filename string) io.Reader {
 	return strings.NewReader(string(input_file_bytes))
 }
 
-func handle(filename, option string) {
+func handle(filename string, mode int) {
 	var r *bufio.Reader
 	var w *bufio.Writer
 	r = bufio.NewReader(ReadFullFile(filename))
-	switch option {
-	case "-t", "--token":
+	switch mode {
+
+	case mode_tokens_debug:
 		DebugTokens(r)
-	case "-x", "--xml":
-		w = MakeFile(filename, "xml")
+
+	case mode_tokens_xml:
+		w = MakeFile(filename, ".xml")
 		TokensXML(w, r)
 		w.Flush()
-	case "-p", "--parse":
+
+	case mode_parse_debug:
 		DebugParse(os.Stdout, r)
-	case "":
-		fmt.Fprintln(os.Stderr, "Default Behavior: No option args given. [TODO]")
+
 	default:
-		fmt.Fprintln(os.Stderr, "Unknown option argument given.")
-		HelpfulExit()
+		panic("Invalid mode")
 	}
 }
-func GetHackFilesFromWorkingDir() []string {
-	var filename_list []string
+
+func GetJackFilesFromWorkingDir() []string {
 	path, err := os.Getwd()
 	if err != nil {
 		failrar(err)
@@ -111,16 +119,17 @@ func GetHackFilesFromWorkingDir() []string {
 	if err != nil {
 		failrar(err)
 	}
-	// check each of the file names for the extention ".hack",
-	// if a .hack is found, then add it to the list of filenames,
+	// check each of the file names for the extention ".jack",
+	// if a .jack is found, then add it to the list of filenames,
 	// which will be returned at the end of the function.
+	var filename_list []string
 	for _, file := range files {
-		if filepath.Ext(file.Name()) == ".hack" {
+		if filepath.Ext(file.Name()) == ".jack" {
 			filename_list = append(filename_list, file.Name())
 		}
 	}
 	if len(filename_list) <= 0 {
-		failrar("There are no .hack files in the working directory.")
+		failrar("There are no .jack files in the working directory.")
 	}
 	return filename_list
 }
@@ -132,7 +141,7 @@ func failrar(a ...interface{}) {
 }
 
 func MakeFile(input_filename, output_suffix string) *bufio.Writer {
-	output_filename := strings.TrimSuffix(input_filename, ".hack")
+	output_filename := strings.TrimSuffix(input_filename, ".jack")
 	output_filename += output_suffix
 	output_file, err := os.Create(output_filename)
 	if err != nil {
@@ -141,27 +150,54 @@ func MakeFile(input_filename, output_suffix string) *bufio.Writer {
 	return bufio.NewWriter(output_file)
 }
 
+func MultiFile(mode int) {
+	file_list := GetJackFilesFromWorkingDir()
+	for _, filename := range file_list {
+		fmt.Fprintln(os.Stderr, filename)
+		handle(filename, mode)
+	}
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Not enough arguments.")
+		HelpfulExit()
+	}
+	switch os.Args[1] {
+	case "-h", "--help":
 		HelpfulExit()
 	}
 	if len(os.Args) > 3 {
 		fmt.Fprintln(os.Stderr, "Too many arguments.")
 		HelpfulExit()
 	}
+
 	option := ""
+	mode := mode_default
 	if len(os.Args) == 3 {
 		option = os.Args[2]
 	}
-	filename := os.Args[1]
-	if filename != "-wd" {
-		handle(filename, option)
+
+	switch option {
+	case "-t", "--token":
+		mode = mode_tokens_debug
+	case "-x", "--xml":
+		mode = mode_tokens_xml
+	case "-p", "--parse":
+		mode = mode_parse_debug
+	case "":
+		fmt.Fprintln(os.Stderr, "[TODO]: No option args given.")
 		os.Exit(0)
+		mode = mode_default
+	default:
+		fmt.Fprintln(os.Stderr, "Unknown option argument given.")
+		HelpfulExit()
 	}
-	file_list := GetHackFilesFromWorkingDir()
-	for _, filename = range file_list {
-		fmt.Fprintln(os.Stderr, filename)
-		handle(filename, option)
+
+	switch os.Args[1] {
+	case "-wd":
+		MultiFile(mode)
+	default:
+		filename := os.Args[1]
+		handle(filename, mode)
 	}
 }
