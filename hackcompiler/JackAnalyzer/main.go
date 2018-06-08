@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/CompilationEngine"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackTokenizer"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,28 +19,30 @@ class DerpClass {
 	static int y;
 	field string s;
 	field bool b;
-
-	function void derp() {
-		
-	}
-
+	function void derp() {}
 }
-
 `
 
 const help_message = `
-USAGE:         JackAnalyzer <filename> [option]
+JackAnalyzer, a Compiler for Jack Programs in Nand2Tetris.
 
-FILENAME:      Use '-e' to use an example instead of a file.
+USAGE:         JackAnalyzer (<filename>|-wd) [option]
+
+FILENAME FLAGS:
+-wd            Uses all .jack files in the working directory.
 
 OPTIONS:
--t, --token    prints tokenizer output; does not parse.
+-t, --token    prints tokenizer output to stdout.
 -p, --parse    Activate Parser.
 -x, --xml      Print tokens as XML, split by line.
+
+HOW TO USE:
+    Use "-wd" in place of the filename argument to iterate
+    through each file in the working directory to use as input.
+    Each input file creates one output file of the same name.
 `
 
-func DebugParse(r io.Reader) {
-	w := os.Stdout
+func DebugParse(w io.Writer, r io.Reader) {
 	tokenizer := JackTokenizer.Create(r)
 	CompilationEngine.Run(w, tokenizer)
 }
@@ -53,14 +57,14 @@ func DebugTokens(r io.Reader) {
 	}
 }
 
-func TokensXML(r io.Reader) {
+func TokensXML(w io.Writer, r io.Reader) {
 	t := JackTokenizer.Create(r)
-	fmt.Println("<tokens>")
+	fmt.Fprintln(w, "<tokens>")
 	for t.HasMoreTokens() {
-		fmt.Println(t.Current())
+		fmt.Fprintln(w, t.Current())
 		t.Advance()
 	}
-	fmt.Println("</tokens>")
+	fmt.Fprintln(w, "</tokens>")
 }
 
 func HelpfulExit() {
@@ -68,39 +72,73 @@ func HelpfulExit() {
 	os.Exit(1)
 }
 
-func errexit(i interface{}) {
-	fmt.Fprintln(os.Stderr, i)
-	os.Exit(1)
-}
-
 func ReadFullFile(filename string) io.Reader {
 	input_file_bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
-		errexit(err)
+		failrar(err)
 	}
 	return strings.NewReader(string(input_file_bytes))
 }
 
 func handle(filename, option string) {
-	var r io.Reader
-	if filename == "-e" {
-		r = strings.NewReader(example)
-	} else {
-		r = ReadFullFile(filename)
-	}
+	var r *bufio.Reader
+	var w *bufio.Writer
+	r = bufio.NewReader(ReadFullFile(filename))
 	switch option {
 	case "-t", "--token":
 		DebugTokens(r)
 	case "-x", "--xml":
-		TokensXML(r)
+		w = MakeFile(filename, "xml")
+		TokensXML(w, r)
+		w.Flush()
 	case "-p", "--parse":
-		DebugParse(r)
+		DebugParse(os.Stdout, r)
 	case "":
 		fmt.Fprintln(os.Stderr, "Default Behavior: No option args given. [TODO]")
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown option argument given.")
 		HelpfulExit()
 	}
+}
+func GetHackFilesFromWorkingDir() []string {
+	var filename_list []string
+	path, err := os.Getwd()
+	if err != nil {
+		failrar(err)
+	}
+	// create a list containing each of the files in the directory.
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		failrar(err)
+	}
+	// check each of the file names for the extention ".hack",
+	// if a .hack is found, then add it to the list of filenames,
+	// which will be returned at the end of the function.
+	for _, file := range files {
+		if filepath.Ext(file.Name()) == ".hack" {
+			filename_list = append(filename_list, file.Name())
+		}
+	}
+	if len(filename_list) <= 0 {
+		failrar("There are no .hack files in the working directory.")
+	}
+	return filename_list
+}
+
+func failrar(a ...interface{}) {
+	fmt.Fprint(os.Stderr, "[EPIC FAIL]: ")
+	fmt.Fprintln(os.Stderr, a...)
+	os.Exit(1)
+}
+
+func MakeFile(input_filename, output_suffix string) *bufio.Writer {
+	output_filename := strings.TrimSuffix(input_filename, ".hack")
+	output_filename += output_suffix
+	output_file, err := os.Create(output_filename)
+	if err != nil {
+		failrar(err)
+	}
+	return bufio.NewWriter(output_file)
 }
 
 func main() {
@@ -117,5 +155,13 @@ func main() {
 		option = os.Args[2]
 	}
 	filename := os.Args[1]
-	handle(filename, option)
+	if filename != "-wd" {
+		handle(filename, option)
+		os.Exit(0)
+	}
+	file_list := GetHackFilesFromWorkingDir()
+	for _, filename = range file_list {
+		fmt.Fprintln(os.Stderr, filename)
+		handle(filename, option)
+	}
 }
