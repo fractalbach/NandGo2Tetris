@@ -44,10 +44,10 @@ var (
 //
 // Location of Stuff in the Stack
 //
-// 			| ... |
-// 			|  x  |
-// 			|  y  |
-// 			|     |  <- Stack Pointer (SP)
+//          | ... |
+//          |  x  |
+//          |  y  |
+//          |     |  <- Stack Pointer (SP)
 //
 // Arithmetic is in the form of x _ y,
 // where _ is an operator (like +, -, <, >, =)
@@ -233,10 +233,6 @@ func errNotImplemented(s string) error {
 	return fmt.Errorf("%s hasn't been implemented yet.", s)
 }
 
-func (cmd *Command) WriteFunction() (string, error) {
-	return "", nil
-}
-
 // at the beginning, create next unique id, and save it.
 // that will also be used to create the return label.
 // Format Args
@@ -246,11 +242,11 @@ func (cmd *Command) WriteFunction() (string, error) {
 // - nArgs + 5
 // - name
 // - return label
-const s_call = ` // call %s %d 
-@RETURN.%s 	// push return address.
+const s_call = `// ===============  call %s %d ====================
+@RETURN.%s  // push return address.
 D=A
 ` + stack.PUSHD + `
-@LCL // push local
+@LCL   // push local
 D=M
 ` + stack.PUSHD + `
 @ARG   // push arg
@@ -262,13 +258,13 @@ D=M
 @THAT  // push that
 D=M
 ` + stack.PUSHD + `
-@%d	   // set D = (SP - (nArgs + 5))
+@%d    // set D <- (SP - nArgs - 5)
 D=A
-@SP 	
+@SP
 D=M-D
-@ARG   // set ARG = D
+@ARG   // set ARG <- D
 M=D
-@SP    // set LCL = SP
+@SP    // set LCL <- SP
 D=M
 @LCL
 M=D
@@ -299,43 +295,54 @@ M=M+1
 A=M-1
 M=0
 `
-
-const s_return = `// return
-@LCL 	// set FRAME = LCL
-D=M
-@FRAME  
-M=D	
-// @5		// set RET = *(FRAME - 5)
-// D=D-A 	// set D = (FRAME - 5)
-// A=D 	// Follow pointer *(FRAME-5)
-// D=M 	// set D = *(FRAME-5)
-// @RET 	// set RET = *(FRAME - 5)	
-// M=D
-` + stack.POPD + `
-@ARG 	// places return value in the right spot.
-A=M		// goto *(ARG)
-M=D 	// set *ARG = pop()
-@ARG	// restores stack pointer.  SP = ARG + 1
-D=M
-@SP
-M=D+1
-` + s_POP_FRAME + `
-@THAT 	// restore that.
-M=D
-` + s_POP_FRAME + `	
-@THIS	// restore this.
-M=D
-` + s_POP_FRAME + `
-@ARG	// restore arg.
-M=D
-` + s_POP_FRAME + `
-@LCL 	// restore local.
-M=D
-` + s_POP_FRAME + `
-A=D
-0; JMP
-`
-
-const s_POP_FRAME = `@FRAME
+const s_POP_FRAME = `@R13
 AM=M-1
 D=M`
+
+const s_return = `// ==================== Return ============================
+        // ~~~~~~~  create frame pointer ~~~~~~~~~    FRAME = LCL
+@LCL    
+D=M
+@R13    // <- using register 13 for frame pointer.
+M=D 
+        // ~~~~~~~  save return address ~~~~~~~~~~~~  RET = *(FRAME - 5)
+@5 
+A=D-A
+D=M 
+@R14    // <- using register 14 for return address.
+M=D
+        // ~~~~~~~ reposition return value ~~~~~~~~~  *ARG = pop()
+` + stack.POPD + `
+@ARG
+A=M
+M=D
+        // ~~~~~~~~~~~~ restore values ~~~~~~~~~~~~~
+@ARG    // restores stack pointer.
+D=M
+@SP     // SP = ARG + 1
+M=D+1
+` + s_POP_FRAME + `
+@THAT   // restore that
+M=D
+` + s_POP_FRAME + ` 
+@THIS   // restore this.
+M=D
+` + s_POP_FRAME + `
+@ARG    // restore arg.
+M=D
+` + s_POP_FRAME + `
+@LCL    // restore local.
+M=D
+        // ~~~~~~~ retrieve and jump to the return address ~~~~~~~~~~~~~
+@R14
+A=M
+0; JMP  // jump to the return address.
+`
+
+/*
+@5     // set RET = *(FRAME - 5)
+D=D-A  // set D = (FRAME - 5)       <- current val in D should be FRAME
+A=D    // Follow pointer *(FRAME-5)
+D=M    // set D = *(FRAME-5)
+@R15   // set RET = *(FRAME - 5)    <- return address is now saved.
+*/
