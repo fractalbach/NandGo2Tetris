@@ -147,11 +147,11 @@ func TestTokenizer(t *testing.T) {
 		// Place tokenized output into a string, trim and split.
 		stdoutStderr, err := cmd.CombinedOutput()
 		errCheck(t, err)
-		b_correct, err := ioutil.ReadFile(correct_token_files[file_num])
-		errCheck(t, err)
 		s_result := strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n")
 
 		// The comparison file: trim space and split by lines
+		b_correct, err := ioutil.ReadFile(correct_token_files[file_num])
+		errCheck(t, err)
 		string_correct := strings.TrimSpace(string(b_correct))
 		string_correct = strings.Replace(string_correct, "\r", "", -1)
 		s_correct := strings.Split(string_correct, "\n")
@@ -171,8 +171,37 @@ func TestTokenizer(t *testing.T) {
 	}
 }
 
+func TestParser(t *testing.T) {
+	// Iterate through each of the source files
+	for file_num, source_file := range input_source_files {
+
+		// Call the hackcompiler parser on the current file.
+		cmd := exec.Command("hackcompiler", source_file, "--parse")
+
+		// Place output into a string, trim and split.
+		stdoutStderr, err := cmd.CombinedOutput()
+		errCheck(t, err)
+		result := strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n")
+
+		// Load the comparison file into a string: trim and split.
+		// The file has \r\n endings, so remove all of the \r bytes.
+		bytes_correct, err := ioutil.ReadFile(correct_token_files[file_num])
+		errCheck(t, err)
+		string_temp := strings.TrimSpace(string(bytes_correct))
+		string_temp = strings.Replace(string_temp, "\r", "", -1)
+		correct := strings.Split(string_temp, "\n")
+
+		// compare the length of the arrays to eliminate any obvious fails.
+		if len(correct) != len(result) {
+			t.Errorf("\n%s\n\tFile lengths do not match. got:(%d), expected:(%d)", source_file, len(result), len(correct))
+			t.FailNow()
+		}
+	}
+}
+
 func errCheck(t *testing.T, err error) {
 	if err != nil {
 		t.Error(err)
+		t.FailNow()
 	}
 }

@@ -29,7 +29,7 @@ Compiles Jack code into Hack Programs for Nand2Tetris.
 USAGE:         hackcompiler (<filename>|-wd) [option]
 
 FILENAME FLAG:
--wd            Uses all .hack files from the working directory.
+-wd            Uses all .jack files from the working directory.
 
 OPTIONS:
 -t, --token    prints tokenizer output to stdout.
