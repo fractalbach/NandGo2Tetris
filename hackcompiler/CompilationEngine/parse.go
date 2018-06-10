@@ -223,12 +223,29 @@ func (e *engine) CompileWhile() {
 func (e *engine) CompileDo() {
 	e.t = e.t.Branch("doStatement")
 	e.CompileToken() // 'do'
-	// begin subroutineCall
-	e.CompileToken() // subroutineName
-	e.CompileToken() // '('
-	e.CompileExpressionList()
-	e.CompileToken() // ')'
-	// end subroutineCall
+
+	// for subroutine calls, you need to do 1 char look-ahead.
+	current_token := e.o.Current()
+	e.o.Advance()
+	next_token := e.o.Current()
+
+	// decide parsing method based on that next token.
+	switch next_token.Content() {
+	case "(": // subroutineCall
+		e.t.Leaf(current_token) // subroutineName
+		e.CompileToken()        // '('
+		e.CompileExpressionList()
+		e.CompileToken() // ')'
+		return
+	case ".": //subroutineCall
+		e.t.Leaf(current_token) // className | varName
+		e.CompileToken()        // '.'
+		e.CompileToken()        // subroutineName
+		e.CompileToken()        // '('
+		e.CompileExpressionList()
+		e.CompileToken() // ')'
+		return
+	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
 }

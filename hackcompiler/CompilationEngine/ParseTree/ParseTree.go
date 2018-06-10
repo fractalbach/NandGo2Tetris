@@ -133,7 +133,7 @@ func endtag(s string) string {
 func spaces(n int) string {
 	s := ""
 	for i := 0; i < n; i++ {
-		s += "\t"
+		s += "  "
 	}
 	return s
 }
