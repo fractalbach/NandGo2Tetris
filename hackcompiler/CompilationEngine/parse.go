@@ -323,7 +323,9 @@ func (e *engine) CompileTerm() {
 }
 
 func (e *engine) CompileExpressionList() {
+	e.t = e.t.Branch("expressionList")
 	if e.o.Current().Content() == ")" {
+		e.t = e.t.Up()
 		return
 	}
 	e.CompileExpression()
@@ -331,6 +333,7 @@ func (e *engine) CompileExpressionList() {
 		e.CompileToken() // ','
 		e.CompileExpression()
 	}
+	e.t = e.t.Up()
 }
 
 // -----------------------------------------------------
