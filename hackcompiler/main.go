@@ -97,7 +97,8 @@ func handle(filename string, mode int) {
 		DebugTokens(r)
 
 	case mode_tokens_xml:
-		w = MakeFile(filename, ".xml")
+		// w = MakeFile(filename, ".xml")
+		w = bufio.NewWriter(os.Stdout)
 		TokensXML(w, r)
 		w.Flush()
 
