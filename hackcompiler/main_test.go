@@ -175,6 +175,9 @@ func TestParser(t *testing.T) {
 	// Iterate through each of the source files
 	for file_num, source_file := range input_source_files {
 
+		// Print name of current file so we can reference bugs to it later.
+		t.Log(source_file)
+
 		// Call the hackcompiler parser on the current file.
 		cmd := exec.Command("hackcompiler", source_file, "--parse")
 
@@ -193,8 +196,15 @@ func TestParser(t *testing.T) {
 
 		// compare the length of the arrays to eliminate any obvious fails.
 		if len(correct) != len(result) {
-			t.Errorf("\n%s\n\tFile lengths do not match. got:(%d), expected:(%d)", source_file, len(result), len(correct))
+			t.Errorf("File lengths do not match. got:(%d), expected:(%d)", len(result), len(correct))
 			t.FailNow()
+		}
+
+		for i := range result {
+			if result[i] != correct[i] {
+				t.Errorf("Line:(%d) does not match. \n\tgot:(%s) \n\texpected:(%s)", i, result[i], correct[i])
+				t.FailNow()
+			}
 		}
 	}
 }
