@@ -188,19 +188,27 @@ func TestParser(t *testing.T) {
 
 		// Load the comparison file into a string: trim and split.
 		// The file has \r\n endings, so remove all of the \r bytes.
-		bytes_correct, err := ioutil.ReadFile(correct_token_files[file_num])
+		bytes_correct, err := ioutil.ReadFile(correct_parse_files[file_num])
 		errCheck(t, err)
 		string_temp := strings.TrimSpace(string(bytes_correct))
 		string_temp = strings.Replace(string_temp, "\r", "", -1)
 		correct := strings.Split(string_temp, "\n")
 
 		// compare the length of the arrays to eliminate any obvious fails.
+		// save the minimum length, and use it to compare lines.
+		minlen := len(result)
 		if len(correct) != len(result) {
 			t.Errorf("File lengths do not match. got:(%d), expected:(%d)", len(result), len(correct))
-			t.FailNow()
+			// use length of the shortest file when matching lines,
+			// in order to prevent out-of-bounds errors when checking each line.
+			if len(correct) < len(result) {
+				minlen = len(correct)
+			}
 		}
 
-		for i := range result {
+		// report information about mismatched lines.
+		// compare lines even if mismatched length, to provide more helpful info.
+		for i := 0; i < minlen; i++ {
 			if result[i] != correct[i] {
 				t.Errorf("Line:(%d) does not match. \n\tgot:(%s) \n\texpected:(%s)", i, result[i], correct[i])
 				t.FailNow()
