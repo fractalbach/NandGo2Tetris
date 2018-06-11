@@ -63,7 +63,7 @@ func (e *engine) CompileClass() {
 	}
 	// closure: (subroutineDec)*
 	for e.hasSubroutineDec() {
-		e.CompileSubroutine()
+		e.CompileSubroutineDec()
 	}
 	e.CurrentToLeaf() // symbol }
 }
@@ -114,6 +114,7 @@ func (e *engine) CompileParameterList() {
 func (e *engine) CompileSubroutineDec() {
 	e.t = e.t.Branch("subroutineDec")
 	e.CompileToken() // ('constructor' | 'function' | 'method')
+	e.CompileToken() // 'void' | type
 	e.CompileToken() // subroutineName
 	e.CompileToken() // '('
 	e.CompileParameterList()
@@ -163,11 +164,11 @@ func (e *engine) CompileStatements() {
 		case "return":
 			e.CompileReturn()
 		default:
-			e.t.Up()
+			e.t = e.t.Up()
 			return
 		}
 	}
-	e.t.Up()
+	e.t = e.t.Up()
 }
 
 func (e *engine) CompileExpression() {
@@ -187,6 +188,7 @@ func (e *engine) CompileLet() {
 	for e.o.Current().Content() == "[" {
 		e.CompileToken() // '['
 		e.CompileExpression()
+		e.CompileToken() // ']'
 	}
 	e.CompileToken() // '='
 	e.CompileExpression()
@@ -203,6 +205,12 @@ func (e *engine) CompileIf() {
 	e.CompileToken() // '{'
 	e.CompileStatements()
 	e.CompileToken() // '}'
+	for e.o.Current().Content() == "else" {
+		e.CompileToken() // 'else'
+		e.CompileToken() // '{'
+		e.CompileStatements()
+		e.CompileToken() // '}'
+	}
 	e.t = e.t.Up()
 }
 
@@ -236,7 +244,7 @@ func (e *engine) CompileDo() {
 		e.CompileToken()        // '('
 		e.CompileExpressionList()
 		e.CompileToken() // ')'
-		return
+
 	case ".": //subroutineCall
 		e.t.Leaf(current_token) // className | varName
 		e.CompileToken()        // '.'
@@ -244,7 +252,7 @@ func (e *engine) CompileDo() {
 		e.CompileToken()        // '('
 		e.CompileExpressionList()
 		e.CompileToken() // ')'
-		return
+
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()

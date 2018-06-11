@@ -10,6 +10,11 @@ import (
 	"testing"
 )
 
+func init() {
+	cmd := exec.Command("go", "install", "-v")
+	cmd.Run()
+}
+
 var (
 	input_source_files = []string{
 		"tests/ExpressionLessSquare/Main.jack",
@@ -68,80 +73,7 @@ func TestFilepathResolution(t *testing.T) {
 	t.Log("Absolute filepaths successfully resolved.")
 }
 
-/*
-func TestSingleProgram(t *testing.T) {
-	cmd := exec.Command("hackcompiler", example_input_filepath, "--xml")
-	stdoutStderr, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Error(err)
-	}
-	s_result := strings.TrimSpace(string(stdoutStderr))
-	r_result := strings.NewReader(s_result)
-
-	b_correct, err := ioutil.ReadFile(correct_token_files[0])
-	if err != nil {
-		t.Error(err)
-	}
-	s_correct := strings.TrimSpace(string(b_correct))
-	r_correct := strings.NewReader(s_correct)
-
-	scanner1 := bufio.NewScanner(r_result)
-	scanner2 := bufio.NewScanner(r_correct)
-
-	c1 := make(chan string)
-	c2 := make(chan string)
-	quit := make(chan bool)
-
-	// begin the first scanner.
-	go func() {
-		for scanner1.Scan() {
-			if scanner1.Text() == "" {
-				continue
-			}
-			c1 <- scanner1.Text()
-		}
-		if err := scanner1.Err(); err != nil {
-			t.Error(err)
-		}
-		close(c1)
-		quit <- true
-	}()
-
-	// begin the second scanner.
-	go func() {
-		for scanner2.Scan() {
-			if scanner2.Text() == "" {
-				continue
-			}
-			c2 <- scanner2.Text()
-		}
-		if err := scanner2.Err(); err != nil {
-			t.Error(err)
-		}
-		close(c2)
-		quit <- true
-	}()
-
-	var s1, s2 string
-	line_num := 1
-	for {
-		select {
-		case <-quit:
-			return
-		default:
-			s1 = <-c1
-			s2 = <-c2
-			if s1 != s2 {
-				t.Errorf("Line %d does not match:\n\t%s\n\t%s\n", line_num, s1, s2)
-			}
-			t.Log(line_num, s1, s2)
-			line_num++
-		}
-	}
-}
-*/
-
-func TestTokenizer(t *testing.T) {
+func __TestTokenizer(t *testing.T) {
 	for file_num, source_file := range input_source_files {
 		cmd := exec.Command("hackcompiler", source_file, "--xml")
 		// Place tokenized output into a string, trim and split.
@@ -205,13 +137,16 @@ func TestParser(t *testing.T) {
 				minlen = len(correct)
 			}
 		}
-
+		if minlen <= 0 {
+			t.Fatalf("Out of bounds. Cannot have a file length:(%d) <= 0", minlen)
+			return
+		}
 		// report information about mismatched lines.
 		// compare lines even if mismatched length, to provide more helpful info.
+
 		for i := 0; i < minlen; i++ {
 			if result[i] != correct[i] {
-				t.Errorf("Line:(%d) does not match. \n\tgot:(%s) \n\texpected:(%s)", i, result[i], correct[i])
-				t.FailNow()
+				t.Fatalf("Line:(%d) does not match. \n\tgot:(%s) \n\texpected:(%s)", i+1, result[i], correct[i])
 			}
 		}
 	}
