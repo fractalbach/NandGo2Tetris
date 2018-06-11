@@ -9,6 +9,8 @@ import (
 	"io"
 )
 
+var counter int
+
 type engine struct {
 	o JackTokenizer.TokenIterator
 	w io.Writer
@@ -98,15 +100,13 @@ func (e *engine) CompileSubroutine() {
 // Parameter List = ((type varName) (',' type varName)*)?
 func (e *engine) CompileParameterList() {
 	e.t = e.t.Branch("parameterList")
-	if e.o.Current().Content() == ")" {
-		e.t = e.t.Up()
-		return
-	}
-	e.CompileToken() // type
-	e.CompileToken() // varName
-	for e.o.Current().Content() == "," {
+	for e.o.Current().Content() != ")" {
 		e.CompileToken() // type
 		e.CompileToken() // varName
+		for e.o.Current().Content() == "," {
+			e.CompileToken() // type
+			e.CompileToken() // varName
+		}
 	}
 	e.t = e.t.Up()
 }
@@ -216,15 +216,13 @@ func (e *engine) CompileIf() {
 
 func (e *engine) CompileWhile() {
 	e.t = e.t.Branch("whileStatement")
-	for e.o.Current().Content() == "else" {
-		e.CompileToken() // 'while'
-		e.CompileToken() // '('
-		e.CompileExpression()
-		e.CompileToken() // ')'
-		e.CompileToken() // '{'
-		e.CompileStatements()
-		e.CompileToken() // '}'
-	}
+	e.CompileToken() // 'while'
+	e.CompileToken() // '('
+	e.CompileExpression()
+	e.CompileToken() // ')'
+	e.CompileToken() // '{'
+	e.CompileStatements()
+	e.CompileToken() // '}'
 	e.t = e.t.Up()
 }
 
@@ -253,6 +251,8 @@ func (e *engine) CompileDo() {
 		e.CompileExpressionList()
 		e.CompileToken() // ')'
 
+	default:
+		panic("wtf your do statement sucks!")
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
@@ -297,6 +297,13 @@ func (e *engine) CompileTerm() {
 			return
 		}
 
+	case JackGrammar.KEYWORD:
+		switch current_token.Content() {
+		case "true", "false", "null", "this":
+			e.t.Leaf(current_token) // keyword const
+			return
+		}
+
 	case JackGrammar.IDENTIFIER:
 		switch next_token.Content() {
 		case "[":
@@ -320,12 +327,9 @@ func (e *engine) CompileTerm() {
 			e.CompileToken() // ')'
 			return
 
-		case "true", "false", "null", "this":
-			e.t.Leaf(current_token) // keyword const
-			return
-
 		default:
 			e.t.Leaf(current_token) // varName
+			return
 		}
 	}
 }
