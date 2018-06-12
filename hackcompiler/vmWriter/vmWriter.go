@@ -86,9 +86,21 @@ func (vw *vmWriter) WritePop(seg Segment, n int) {
 func (vw *vmWriter) WriteArithmetic(cmd Command) {
 	fmt.Fprintln(vw.w, CommandString[cmd])
 }
-func (vw *vmWriter) WriteLabel(label string)                {}
-func (vw *vmWriter) WriteGoto(label string)                 {}
-func (vw *vmWriter) WriteIf(label string)                   {}
-func (vw *vmWriter) WriteCall(name string, nArgs int)       {}
-func (vw *vmWriter) WriteFunction(name string, nLocals int) {}
-func (vw *vmWriter) WriteReturn()                           {}
+func (vw *vmWriter) WriteLabel(label string) {
+	fmt.Fprintln(vw.w, "label", label)
+}
+func (vw *vmWriter) WriteGoto(label string) {
+	fmt.Fprintln(vw.w, "goto", label)
+}
+func (vw *vmWriter) WriteIf(label string) {
+	fmt.Fprintln(vw.w, "if-goto", label)
+}
+func (vw *vmWriter) WriteCall(name string, nArgs int) {
+	fmt.Fprintln(vw.w, "call", name, nArgs)
+}
+func (vw *vmWriter) WriteFunction(name string, nLocals int) {
+	fmt.Fprintln(vw.w, "function", name, nLocals)
+}
+func (vw *vmWriter) WriteReturn() {
+	fmt.Fprintln(vw.w, "return")
+}
