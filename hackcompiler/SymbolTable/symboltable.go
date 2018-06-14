@@ -12,6 +12,8 @@ phase of the compiler.
 */
 package SymbolTable
 
+import "fmt"
+
 type Kind int
 
 const (
@@ -29,10 +31,15 @@ type SymbolTable interface {
 	KindOf(string) Kind
 	TypeOf(string) string
 	IndexOf(string) int
+	PrintClassTable()
+	PrintSubroutineTable()
 }
 
 func NewSymbolTable() SymbolTable {
-	return &symbolTable{}
+	return &symbolTable{
+		class_table:      make(map[string]symbol),
+		subroutine_table: make(map[string]symbol),
+	}
 }
 
 type symbol struct {
@@ -134,4 +141,48 @@ func (st *symbolTable) lookupSymbol(identifier string) symbol {
 		return symbol
 	}
 	panic("Cannot find symbol.")
+}
+
+var table_format string = "%10s %10s %10s %4d\n"
+
+func (st *symbolTable) PrintClassTable() {
+	for i, v := range st.class_table {
+		fmt.Printf(table_format, i, String(v.kind), v.type_, v.index)
+	}
+	fmt.Println()
+}
+
+func (st *symbolTable) PrintSubroutineTable() {
+	for i, v := range st.subroutine_table {
+		fmt.Printf(table_format, i, String(v.kind), v.type_, v.index)
+	}
+	fmt.Println()
+}
+
+func String(k Kind) string {
+	switch k {
+	case STATIC:
+		return "static"
+	case FIELD:
+		return "field"
+	case ARG:
+		return "arg"
+	case VAR:
+		return "var"
+	}
+	return "None"
+}
+
+func StringToKind(s string) Kind {
+	switch s {
+	case "static":
+		return STATIC
+	case "field":
+		return FIELD
+	case "arg":
+		return ARG
+	case "var":
+		return VAR
+	}
+	return NONE
 }

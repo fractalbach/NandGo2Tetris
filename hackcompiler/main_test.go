@@ -103,7 +103,7 @@ func __TestTokenizer(t *testing.T) {
 	}
 }
 
-func TestParser(t *testing.T) {
+func __TestParser(t *testing.T) {
 	// Iterate through each of the source files
 	for file_num, source_file := range input_source_files {
 

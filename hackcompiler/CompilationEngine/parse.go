@@ -6,10 +6,14 @@ import (
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/CompilationEngine/ParseTree"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackGrammar"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackTokenizer"
+	"github.com/fractalbach/nandGo2tetris/hackcompiler/SymbolTable"
 	"io"
 )
 
 var counter int
+var st SymbolTable.SymbolTable
+var className string
+var subroutineName string
 
 type engine struct {
 	o JackTokenizer.TokenIterator
@@ -23,8 +27,11 @@ func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator) {
 		w: w,
 		t: ParseTree.NewParseTree("class"),
 	}
+	st = SymbolTable.NewSymbolTable()
 	e.CompileClass()
-	fmt.Fprintln(w, e.t.Root())
+	// fmt.Fprintln(w, e.t.Root())
+	fmt.Println("Class Table", className)
+	st.PrintClassTable()
 }
 
 func (e *engine) tag(s string) {
@@ -55,6 +62,7 @@ func (e *engine) Write(p []byte) (int, error) {
 //
 func (e *engine) CompileClass() {
 	e.CompileToken() // keyword 'class'
+	className = e.o.Current().Content()
 	e.CompileToken() // identifier className
 	e.CompileToken() // symbol {
 	// closure:  (classVarDec)*
@@ -65,7 +73,11 @@ func (e *engine) CompileClass() {
 	}
 	// closure: (subroutineDec)*
 	for e.hasSubroutineDec() {
+		st.StartSubroutine()
+		st.Define("this", className, SymbolTable.ARG)
 		e.CompileSubroutineDec()
+		fmt.Println("Subroutine Table:", subroutineName)
+		st.PrintSubroutineTable()
 	}
 	e.CurrentToLeaf() // symbol }
 }
@@ -73,12 +85,18 @@ func (e *engine) CompileClass() {
 // ClassVarDec = ('static' | 'field') type varName (',' varName)* ';'
 func (e *engine) CompileClassVarDec() {
 	e.t = e.t.Branch("classVarDec")
+	varKind := SymbolTable.StringToKind(e.o.Current().Content())
 	e.CompileToken() // ('static' | 'field')
+	varType := e.o.Current().Content()
 	e.CompileToken() // type
+	varName := e.o.Current().Content()
 	e.CompileToken() // varName
+	st.Define(varName, varType, varKind)
 	for e.o.Current().Content() == "," {
-		e.CompileToken() // ','
-		e.CompileToken() // varName
+		e.CompileToken()                     // ','
+		varName = e.o.Current().Content()    // saves the varName
+		e.CompileToken()                     // varName
+		st.Define(varName, varType, varKind) // adds to symbol table.
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
@@ -99,13 +117,23 @@ func (e *engine) CompileSubroutine() {
 
 // Parameter List = ((type varName) (',' type varName)*)?
 func (e *engine) CompileParameterList() {
+	sName := ""
+	sType := ""
+	sKind := SymbolTable.ARG
 	e.t = e.t.Branch("parameterList")
 	for e.o.Current().Content() != ")" {
+		sType = e.o.Current().Content()
 		e.CompileToken() // type
+		sName = e.o.Current().Content()
 		e.CompileToken() // varName
+		st.Define(sName, sType, sKind)
 		for e.o.Current().Content() == "," {
+			e.CompileToken() // ','
+			sType = e.o.Current().Content()
 			e.CompileToken() // type
+			sName = e.o.Current().Content()
 			e.CompileToken() // varName
+			st.Define(sName, sType, sKind)
 		}
 	}
 	e.t = e.t.Up()
@@ -115,6 +143,7 @@ func (e *engine) CompileSubroutineDec() {
 	e.t = e.t.Branch("subroutineDec")
 	e.CompileToken() // ('constructor' | 'function' | 'method')
 	e.CompileToken() // 'void' | type
+	subroutineName = e.o.Current().Content()
 	e.CompileToken() // subroutineName
 	e.CompileToken() // '('
 	e.CompileParameterList()
