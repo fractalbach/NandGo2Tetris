@@ -10,6 +10,7 @@ import (
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/SymbolTable"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/vmWriter"
 	"io"
+	"strconv"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 	counter             int
 	nLocals             int
 	nArgs               int
+	expression_buf      []string
 	className           string
 	subroutineName      string
 	symbol_table_output string
@@ -101,10 +103,8 @@ func (e *engine) CompileClass() {
 		st.StartSubroutine()
 		st.Define("this", className, SymbolTable.ARG)
 		e.CompileSubroutineDec()
-		fullname := subroutineName + "." + className
-		nLocals = st.VarCount(SymbolTable.VAR)
-		vm.WriteFunction(fullname, nLocals)
-		symbol_table_output += fmt.Sprintf("Subroutine Table: %s\n", fullname)
+		vm.WriteReturn()
+		symbol_table_output += ("Subroutine Table:" + className + "." + subroutineName)
 		symbol_table_output += st.PrintSubroutineTable()
 	}
 	e.CurrentToLeaf() // symbol }
@@ -187,6 +187,13 @@ func (e *engine) CompileSubroutineBody() {
 	for e.o.Current().Content() == "var" {
 		e.CompileVarDec()
 	}
+	// writes the vm code for declaring a function at this point,
+	// since all of the local variable declarations have finished:
+	// The subroutine symbol table is complete, and nLocals can be counted.
+	fullname := subroutineName + "." + className
+	nLocals = st.VarCount(SymbolTable.VAR)
+	vm.WriteFunction(fullname, nLocals)
+	// continue on to compile the proccesses within the function.
 	e.CompileStatements()
 	e.CompileToken() // '}'
 	e.t = e.t.Up()
@@ -210,6 +217,7 @@ func (e *engine) CompileVarDec() {
 		sName = e.o.Current().Content()
 		e.CompileToken() // varName
 		st.Define(sName, sType, sKind)
+		nLocals++
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
@@ -241,8 +249,11 @@ func (e *engine) CompileExpression() {
 	e.t = e.t.Branch("expression")
 	e.CompileTerm()
 	for e.isOperator() {
+		op := e.o.Current().Content()
 		e.CompileToken() // op
 		e.CompileTerm()
+		cmd := vmWriter.OpToCmd(op)
+		vm.WriteArithmetic(cmd)
 	}
 	e.t = e.t.Up()
 }
@@ -301,6 +312,10 @@ func (e *engine) CompileDo() {
 	e.o.Advance()
 	next_token := e.o.Current()
 
+	// do statements create function calls, so we want to save the name.
+	// nArgs will be automatically handled in the compileExpressionList()
+	sName := current_token.Content()
+
 	// decide parsing method based on that next token.
 	switch next_token.Content() {
 	case "(": // subroutineCall
@@ -312,8 +327,9 @@ func (e *engine) CompileDo() {
 	case ".": //subroutineCall
 		e.t.Leaf(current_token) // className | varName
 		e.CompileToken()        // '.'
-		e.CompileToken()        // subroutineName
-		e.CompileToken()        // '('
+		sName += ("." + e.o.Current().Content())
+		e.CompileToken() // subroutineName
+		e.CompileToken() // '('
 		e.CompileExpressionList()
 		e.CompileToken() // ')'
 
@@ -322,6 +338,7 @@ func (e *engine) CompileDo() {
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
+	vm.WriteCall(sName, nArgs)
 }
 
 func (e *engine) CompileReturn() {
@@ -332,7 +349,6 @@ func (e *engine) CompileReturn() {
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
-	vm.WriteReturn()
 }
 
 func (e *engine) CompileTerm() {
@@ -347,8 +363,14 @@ func (e *engine) CompileTerm() {
 
 	// switch based on the first token's kind.
 	switch current_token.Kind() {
-	case JackGrammar.STRING_CONST, JackGrammar.INT_CONST:
+	case JackGrammar.STRING_CONST:
 		e.t.Leaf(current_token)
+		return
+
+	case JackGrammar.INT_CONST:
+		e.t.Leaf(current_token)
+		val, _ := strconv.Atoi(current_token.Content())
+		vm.WritePush(vmWriter.CONST, val)
 		return
 
 	case JackGrammar.SYMBOL:
@@ -402,15 +424,18 @@ func (e *engine) CompileTerm() {
 }
 
 func (e *engine) CompileExpressionList() {
+	nArgs = 0
 	e.t = e.t.Branch("expressionList")
 	if e.o.Current().Content() == ")" {
 		e.t = e.t.Up()
 		return
 	}
 	e.CompileExpression()
+	nArgs++
 	for e.o.Current().Content() == "," {
 		e.CompileToken() // ','
 		e.CompileExpression()
+		nArgs++
 	}
 	e.t = e.t.Up()
 }

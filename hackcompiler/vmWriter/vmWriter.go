@@ -30,6 +30,8 @@ const (
 	AND
 	OR
 	NOT
+	MULT
+	DIV
 )
 
 var SegmentString = map[Segment]string{
@@ -44,15 +46,31 @@ var SegmentString = map[Segment]string{
 }
 
 var CommandString = map[Command]string{
-	ADD: "add",
-	SUB: "sub",
-	NEG: "neg",
-	EQ:  "eq",
-	GT:  "gt",
-	LT:  "lt",
-	AND: "and",
-	OR:  "or",
-	NOT: "not",
+	ADD:  "add",
+	SUB:  "sub",
+	NEG:  "neg",
+	EQ:   "eq",
+	GT:   "gt",
+	LT:   "lt",
+	AND:  "and",
+	OR:   "or",
+	NOT:  "not",
+	MULT: `call Math.multiply 2`,
+	DIV:  `call Math.divide 2`,
+}
+
+var mapSymbolToCmd = map[string]Command{
+	"+": ADD,
+	"-": SUB,
+	"~": NEG,
+	"=": EQ,
+	">": GT,
+	"<": LT,
+	"&": AND,
+	"|": OR,
+	"!": NOT,
+	"*": MULT,
+	"/": DIV,
 }
 
 type VMWriter interface {
@@ -78,10 +96,10 @@ type vmWriter struct {
 }
 
 func (vw *vmWriter) WritePush(seg Segment, n int) {
-	fmt.Fprintln(vw.w, "pop", SegmentString[seg], n)
+	fmt.Fprintln(vw.w, "push", SegmentString[seg], n)
 }
 func (vw *vmWriter) WritePop(seg Segment, n int) {
-	fmt.Fprintln(vw.w, "push", SegmentString[seg], n)
+	fmt.Fprintln(vw.w, "pop", SegmentString[seg], n)
 }
 func (vw *vmWriter) WriteArithmetic(cmd Command) {
 	fmt.Fprintln(vw.w, CommandString[cmd])
@@ -103,4 +121,13 @@ func (vw *vmWriter) WriteFunction(name string, nLocals int) {
 }
 func (vw *vmWriter) WriteReturn() {
 	fmt.Fprintln(vw.w, "return")
+}
+
+func OpToCmd(op string) Command {
+	cmd, ok := mapSymbolToCmd[op]
+	if !ok {
+		s := fmt.Sprintln("The given operator ", op, " cannot be converted to a command.")
+		panic(s)
+	}
+	return cmd
 }
