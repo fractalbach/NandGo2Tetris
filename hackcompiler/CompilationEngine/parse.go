@@ -15,13 +15,20 @@ var st SymbolTable.SymbolTable
 var className string
 var subroutineName string
 
+type OPTION int
+
+const (
+	OP_SYM_TBL OPTION = 1 << iota
+	OP_XML
+)
+
 type engine struct {
 	o JackTokenizer.TokenIterator
 	w io.Writer
 	t ParseTree.ParseTree
 }
 
-func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator) {
+func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator, opt OPTION) {
 	e := engine{
 		o: tokenizer,
 		w: w,
@@ -29,9 +36,11 @@ func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator) {
 	}
 	st = SymbolTable.NewSymbolTable()
 	e.CompileClass()
-	// fmt.Fprintln(w, e.t.Root())
-	fmt.Println("Class Table", className)
-	st.PrintClassTable()
+	switch opt {
+	case OP_SYM_TBL:
+	case OP_XML:
+		fmt.Fprintln(w, e.t.Root())
+	}
 }
 
 func (e *engine) tag(s string) {
@@ -70,13 +79,15 @@ func (e *engine) CompileClass() {
 		for e.hasClassVarDec() == true {
 			e.CompileClassVarDec()
 		}
+		fmt.Println("Class Table:", className)
+		st.PrintClassTable()
 	}
 	// closure: (subroutineDec)*
 	for e.hasSubroutineDec() {
 		st.StartSubroutine()
 		st.Define("this", className, SymbolTable.ARG)
 		e.CompileSubroutineDec()
-		fmt.Println("Subroutine Table:", subroutineName)
+		fmt.Printf("Subroutine Table: %s.%s\n", className, subroutineName)
 		st.PrintSubroutineTable()
 	}
 	e.CurrentToLeaf() // symbol }
@@ -164,15 +175,24 @@ func (e *engine) CompileSubroutineBody() {
 	e.t = e.t.Up()
 }
 
-// Compile Variable Declarations.
+// Compile Variable Declarations.  Adds Variables to the Symbol Table,
+// at the scope of Subroutine.
 func (e *engine) CompileVarDec() {
+	sName := ""
+	sType := ""
+	sKind := SymbolTable.VAR
 	e.t = e.t.Branch("varDec")
 	e.CompileToken() // 'var'
+	sType = e.o.Current().Content()
 	e.CompileToken() // type
+	sName = e.o.Current().Content()
 	e.CompileToken() // varName
+	st.Define(sName, sType, sKind)
 	for e.o.Current().Content() == "," {
 		e.CompileToken() // ','
+		sName = e.o.Current().Content()
 		e.CompileToken() // varName
+		st.Define(sName, sType, sKind)
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()

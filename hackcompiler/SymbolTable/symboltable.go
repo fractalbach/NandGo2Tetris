@@ -143,7 +143,7 @@ func (st *symbolTable) lookupSymbol(identifier string) symbol {
 	panic("Cannot find symbol.")
 }
 
-var table_format string = "%10s %10s %10s %4d\n"
+var table_format string = "%15s %8s %15s %4d\n"
 
 func (st *symbolTable) PrintClassTable() {
 	for i, v := range st.class_table {
