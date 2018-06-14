@@ -56,14 +56,14 @@ var CommandString = map[Command]string{
 }
 
 type VMWriter interface {
-	WritePush(Segment, int)
-	WritePop(Segment, int)
-	WriteArithmetic(Command)
-	WriteLabel(string)
-	WriteGoto(string)
-	WriteIf(string)
-	WriteCall(string, int)
-	WriteFunction(string, int)
+	WritePush(segment Segment, n int)
+	WritePop(segment Segment, n int)
+	WriteArithmetic(cmd Command)
+	WriteLabel(label string)
+	WriteGoto(label string)
+	WriteIf(label string)
+	WriteCall(name string, nArgs int)
+	WriteFunction(name string, nLocals int)
 	WriteReturn()
 }
 
