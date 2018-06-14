@@ -2,17 +2,22 @@
 package CompilationEngine
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/CompilationEngine/ParseTree"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackGrammar"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackTokenizer"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/SymbolTable"
+	"github.com/fractalbach/nandGo2tetris/hackcompiler/vmWriter"
 	"io"
 )
 
 var (
-	counter             int
 	st                  SymbolTable.SymbolTable
+	vm                  vmWriter.VMWriter
+	counter             int
+	nLocals             int
+	nArgs               int
 	className           string
 	subroutineName      string
 	symbol_table_output string
@@ -23,7 +28,7 @@ type OPTION int
 const (
 	OP_SYM_TBL OPTION = 1 << iota
 	OP_XML
-	OP_SYM_CODE
+	OP_CODE
 )
 
 type engine struct {
@@ -38,13 +43,17 @@ func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator, opt OPTION) {
 		w: w,
 		t: ParseTree.NewParseTree("class"),
 	}
+	buf := new(bytes.Buffer)
+	vm = vmWriter.NewVMWriter(buf)
 	st = SymbolTable.NewSymbolTable()
 	e.CompileClass()
 	switch opt {
 	case OP_SYM_TBL:
-		fmt.Print(symbol_table_output)
+		fmt.Fprint(w, symbol_table_output)
 	case OP_XML:
 		fmt.Fprintln(w, e.t.Root())
+	case OP_CODE:
+		buf.WriteTo(w)
 	}
 }
 
@@ -92,7 +101,10 @@ func (e *engine) CompileClass() {
 		st.StartSubroutine()
 		st.Define("this", className, SymbolTable.ARG)
 		e.CompileSubroutineDec()
-		symbol_table_output += fmt.Sprintf("Subroutine Table: %s.%s\n", className, subroutineName)
+		fullname := subroutineName + "." + className
+		nLocals = st.VarCount(SymbolTable.VAR)
+		vm.WriteFunction(fullname, nLocals)
+		symbol_table_output += fmt.Sprintf("Subroutine Table: %s\n", fullname)
 		symbol_table_output += st.PrintSubroutineTable()
 	}
 	e.CurrentToLeaf() // symbol }
@@ -320,6 +332,7 @@ func (e *engine) CompileReturn() {
 	}
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
+	vm.WriteReturn()
 }
 
 func (e *engine) CompileTerm() {
