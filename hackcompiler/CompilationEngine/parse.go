@@ -10,16 +10,20 @@ import (
 	"io"
 )
 
-var counter int
-var st SymbolTable.SymbolTable
-var className string
-var subroutineName string
+var (
+	counter             int
+	st                  SymbolTable.SymbolTable
+	className           string
+	subroutineName      string
+	symbol_table_output string
+)
 
 type OPTION int
 
 const (
 	OP_SYM_TBL OPTION = 1 << iota
 	OP_XML
+	OP_SYM_CODE
 )
 
 type engine struct {
@@ -38,6 +42,7 @@ func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator, opt OPTION) {
 	e.CompileClass()
 	switch opt {
 	case OP_SYM_TBL:
+		fmt.Print(symbol_table_output)
 	case OP_XML:
 		fmt.Fprintln(w, e.t.Root())
 	}
@@ -79,16 +84,16 @@ func (e *engine) CompileClass() {
 		for e.hasClassVarDec() == true {
 			e.CompileClassVarDec()
 		}
-		fmt.Println("Class Table:", className)
-		st.PrintClassTable()
+		symbol_table_output += fmt.Sprintln("Class Table:", className)
+		symbol_table_output += st.PrintClassTable()
 	}
 	// closure: (subroutineDec)*
 	for e.hasSubroutineDec() {
 		st.StartSubroutine()
 		st.Define("this", className, SymbolTable.ARG)
 		e.CompileSubroutineDec()
-		fmt.Printf("Subroutine Table: %s.%s\n", className, subroutineName)
-		st.PrintSubroutineTable()
+		symbol_table_output += fmt.Sprintf("Subroutine Table: %s.%s\n", className, subroutineName)
+		symbol_table_output += st.PrintSubroutineTable()
 	}
 	e.CurrentToLeaf() // symbol }
 }

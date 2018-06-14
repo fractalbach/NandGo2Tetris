@@ -31,8 +31,8 @@ type SymbolTable interface {
 	KindOf(string) Kind
 	TypeOf(string) string
 	IndexOf(string) int
-	PrintClassTable()
-	PrintSubroutineTable()
+	PrintClassTable() string
+	PrintSubroutineTable() string
 }
 
 func NewSymbolTable() SymbolTable {
@@ -145,18 +145,20 @@ func (st *symbolTable) lookupSymbol(identifier string) symbol {
 
 var table_format string = "%15s %8s %15s %4d\n"
 
-func (st *symbolTable) PrintClassTable() {
+func (st *symbolTable) PrintClassTable() string {
+	output := ""
 	for i, v := range st.class_table {
-		fmt.Printf(table_format, i, String(v.kind), v.type_, v.index)
+		output += fmt.Sprintf(table_format, i, String(v.kind), v.type_, v.index)
 	}
-	fmt.Println()
+	return output + "\n"
 }
 
-func (st *symbolTable) PrintSubroutineTable() {
+func (st *symbolTable) PrintSubroutineTable() string {
+	output := ""
 	for i, v := range st.subroutine_table {
-		fmt.Printf(table_format, i, String(v.kind), v.type_, v.index)
+		output += fmt.Sprintf(table_format, i, String(v.kind), v.type_, v.index)
 	}
-	fmt.Println()
+	return output + "\n"
 }
 
 func String(k Kind) string {
