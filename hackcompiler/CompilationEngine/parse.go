@@ -190,7 +190,7 @@ func (e *engine) CompileSubroutineBody() {
 	// writes the vm code for declaring a function at this point,
 	// since all of the local variable declarations have finished:
 	// The subroutine symbol table is complete, and nLocals can be counted.
-	fullname := subroutineName + "." + className
+	fullname := className + "." + subroutineName
 	nLocals = st.VarCount(SymbolTable.VAR)
 	vm.WriteFunction(fullname, nLocals)
 	// continue on to compile the proccesses within the function.
