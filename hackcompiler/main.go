@@ -7,6 +7,7 @@ import (
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackTokenizer"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,6 +56,8 @@ const (
 	mode_symbol_table
 	mode_vm_code
 )
+
+var using_wd bool = false
 
 func ParseAndCompile(w io.Writer, r io.Reader) {
 	tokenizer := JackTokenizer.Create(r)
@@ -105,28 +108,35 @@ func ReadFullFile(filename string) io.Reader {
 }
 
 func handle(filename string, mode Mode) {
-	var r *bufio.Reader
-	var w *bufio.Writer
-	r = bufio.NewReader(ReadFullFile(filename))
+	w := bufio.NewWriter(os.Stdout)
+	r := bufio.NewReader(ReadFullFile(filename))
 	switch mode {
-
 	case mode_tokens_debug:
 		DebugTokens(r)
 
 	case mode_tokens_xml:
-		// w = MakeFile(filename, ".xml")
-		w = bufio.NewWriter(os.Stdout)
+		if using_wd {
+			w = MakeFile(filename, ".xml")
+		}
 		TokensXML(w, r)
 		w.Flush()
 
 	case mode_parse_debug:
-		DebugParse(os.Stdout, r)
+		if using_wd {
+			w = MakeFile(filename, ".xml")
+		}
+		DebugParse(w, r)
+		w.Flush()
 
 	case mode_symbol_table:
 		ParseSymbolTables(os.Stdout, r)
 
 	case mode_vm_code:
-		ParseAndCompile(os.Stdout, r)
+		if using_wd {
+			w = MakeFile(filename, ".vm")
+		}
+		ParseAndCompile(w, r)
+		w.Flush()
 
 	default:
 		panic("Invalid mode")
@@ -171,13 +181,14 @@ func MakeFile(input_filename, output_suffix string) *bufio.Writer {
 	if err != nil {
 		failrar(err)
 	}
+	log.Println("Out:", output_filename)
 	return bufio.NewWriter(output_file)
 }
 
 func MultiFile(mode Mode) {
 	file_list := GetJackFilesFromWorkingDir()
 	for _, filename := range file_list {
-		fmt.Fprintln(os.Stderr, filename)
+		log.Println("In: ", filename)
 		handle(filename, mode)
 	}
 }
@@ -219,6 +230,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "-wd":
+		using_wd = true
 		MultiFile(mode)
 	default:
 		filename := os.Args[1]

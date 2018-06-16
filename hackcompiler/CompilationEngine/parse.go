@@ -37,6 +37,7 @@ var kindToSeg = map[SymbolTable.Kind]vmWriter.Segment{
 	SymbolTable.ARG:    vmWriter.ARG,
 	SymbolTable.STATIC: vmWriter.STATIC,
 	SymbolTable.VAR:    vmWriter.LOCAL,
+	SymbolTable.FIELD:  vmWriter.THIS,
 }
 
 type engine struct {
@@ -371,6 +372,7 @@ func (e *engine) CompileDo() {
 	e.CompileToken() // ';'
 	e.t = e.t.Up()
 	vm.WriteCall(sName, nArgs)
+	vm.WritePop(vmWriter.TEMP, 0)
 }
 
 func (e *engine) CompileReturn() {
@@ -468,18 +470,9 @@ func (e *engine) CompileTerm() {
 
 		default:
 			varName := current_token.Content()
-			sKind := st.KindOf(varName)
-			sIndex := st.IndexOf(varName)
-			switch sKind {
-			case SymbolTable.VAR:
-				vm.WritePush(vmWriter.LOCAL, sIndex)
-			case SymbolTable.ARG:
-				vm.WritePush(vmWriter.ARG, sIndex)
-			case SymbolTable.STATIC:
-				vm.WritePush(vmWriter.STATIC, sIndex)
-			case SymbolTable.FIELD:
-				panic("I'm not sure what to do with FIELD VARIABLES yet!")
-			}
+			segment := kindToSeg[st.KindOf(varName)]
+			index := st.IndexOf(varName)
+			vm.WritePush(segment, index)
 			e.t.Leaf(current_token) // varName
 			return
 		}
