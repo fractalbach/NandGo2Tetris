@@ -16,13 +16,13 @@ import (
 var (
 	st                  SymbolTable.SymbolTable
 	vm                  vmWriter.VMWriter
-	counter             int
 	nLocals             int
-	nArgs               int
 	expression_buf      []string
 	className           string
 	subroutineName      string
 	symbol_table_output string
+	label_counter       int = 0
+	// void_functions          = make(map[string]bool)
 )
 
 type OPTION int
@@ -32,6 +32,12 @@ const (
 	OP_XML
 	OP_CODE
 )
+
+var kindToSeg = map[SymbolTable.Kind]vmWriter.Segment{
+	SymbolTable.ARG:    vmWriter.ARG,
+	SymbolTable.STATIC: vmWriter.STATIC,
+	SymbolTable.VAR:    vmWriter.LOCAL,
+}
 
 type engine struct {
 	o JackTokenizer.TokenIterator
@@ -101,10 +107,9 @@ func (e *engine) CompileClass() {
 	// closure: (subroutineDec)*
 	for e.hasSubroutineDec() {
 		st.StartSubroutine()
-		st.Define("this", className, SymbolTable.ARG)
 		e.CompileSubroutineDec()
 		vm.WriteReturn()
-		symbol_table_output += ("Subroutine Table:" + className + "." + subroutineName)
+		symbol_table_output += ("Subroutine Table:" + className + "." + subroutineName + "\n")
 		symbol_table_output += st.PrintSubroutineTable()
 	}
 	e.CurrentToLeaf() // symbol }
@@ -130,18 +135,18 @@ func (e *engine) CompileClassVarDec() {
 	e.t = e.t.Up()
 }
 
-// CompileSubroutine a single subroutine declaration.
-func (e *engine) CompileSubroutine() {
-	e.t = e.t.Branch("subroutine")
-	e.CompileToken() // ('static' | 'field' | 'constructor')
-	e.CompileToken() // ('void' | type)
-	e.CompileToken() // subroutineName
-	e.CompileToken() // '('
-	e.CompileParameterList()
-	e.CompileToken() // ')'
-	e.CompileSubroutineBody()
-	e.t = e.t.Up()
-}
+// // CompileSubroutine a single subroutine declaration.
+// func (e *engine) CompileSubroutine() {
+// 	e.t = e.t.Branch("subroutine")
+// 	e.CompileToken() // ('static' | 'field' | 'constructor')
+// 	e.CompileToken() // ('void' | type)
+// 	e.CompileToken() // subroutineName
+// 	e.CompileToken() // '('
+// 	e.CompileParameterList()
+// 	e.CompileToken() // ')'
+// 	e.CompileSubroutineBody()
+// 	e.t = e.t.Up()
+// }
 
 // Parameter List = ((type varName) (',' type varName)*)?
 func (e *engine) CompileParameterList() {
@@ -169,6 +174,9 @@ func (e *engine) CompileParameterList() {
 
 func (e *engine) CompileSubroutineDec() {
 	e.t = e.t.Branch("subroutineDec")
+	if e.o.Current().Content() == "method" {
+		st.Define("this", className, SymbolTable.ARG)
+	}
 	e.CompileToken() // ('constructor' | 'function' | 'method')
 	e.CompileToken() // 'void' | type
 	subroutineName = e.o.Current().Content()
@@ -261,6 +269,9 @@ func (e *engine) CompileExpression() {
 func (e *engine) CompileLet() {
 	e.t = e.t.Branch("letStatement")
 	e.CompileToken() // 'let'
+	sName := e.o.Current().Content()
+	sKind := st.KindOf(sName)
+	sIndex := st.IndexOf(sName)
 	e.CompileToken() // varName
 	for e.o.Current().Content() == "[" {
 		e.CompileToken() // '['
@@ -270,37 +281,58 @@ func (e *engine) CompileLet() {
 	e.CompileToken() // '='
 	e.CompileExpression()
 	e.CompileToken() // ';'
+	vm.WritePop(kindToSeg[sKind], sIndex)
 	e.t = e.t.Up()
 }
 
 func (e *engine) CompileIf() {
+	prefix := fmt.Sprint(className, ".", subroutineName, ".label.")
+	label1 := fmt.Sprint(prefix, "if.", label_counter)
+	label2 := fmt.Sprint(prefix, "endif.", label_counter)
+	// finished_first_else := false
+	label_counter++
 	e.t = e.t.Branch("ifStatement")
 	e.CompileToken() // 'if'
 	e.CompileToken() // '('
 	e.CompileExpression()
 	e.CompileToken() // ')'
+	vm.WriteArithmetic(vmWriter.NOT)
+	vm.WriteIf(label1)
 	e.CompileToken() // '{'
 	e.CompileStatements()
 	e.CompileToken() // '}'
+	vm.WriteGoto(label2)
+	vm.WriteLabel(label1)
 	for e.o.Current().Content() == "else" {
 		e.CompileToken() // 'else'
 		e.CompileToken() // '{'
 		e.CompileStatements()
 		e.CompileToken() // '}'
+		// finished_first_else = true
 	}
+	vm.WriteLabel(label2)
 	e.t = e.t.Up()
 }
 
 func (e *engine) CompileWhile() {
+	prefix := fmt.Sprint(className, ".", subroutineName, ".label.")
+	label1 := fmt.Sprint(prefix, "while.", label_counter)
+	label2 := fmt.Sprint(prefix, "endwhile.", label_counter)
+	label_counter++
+	vm.WriteLabel(label1)
 	e.t = e.t.Branch("whileStatement")
 	e.CompileToken() // 'while'
 	e.CompileToken() // '('
 	e.CompileExpression()
 	e.CompileToken() // ')'
+	vm.WriteArithmetic(vmWriter.NOT)
+	vm.WriteIf(label2)
 	e.CompileToken() // '{'
 	e.CompileStatements()
 	e.CompileToken() // '}'
 	e.t = e.t.Up()
+	vm.WriteGoto(label1)
+	vm.WriteLabel(label2)
 }
 
 func (e *engine) CompileDo() {
@@ -313,7 +345,7 @@ func (e *engine) CompileDo() {
 	next_token := e.o.Current()
 
 	// do statements create function calls, so we want to save the name.
-	// nArgs will be automatically handled in the compileExpressionList()
+	nArgs := 0
 	sName := current_token.Content()
 
 	// decide parsing method based on that next token.
@@ -321,7 +353,7 @@ func (e *engine) CompileDo() {
 	case "(": // subroutineCall
 		e.t.Leaf(current_token) // subroutineName
 		e.CompileToken()        // '('
-		e.CompileExpressionList()
+		nArgs = e.CompileExpressionList()
 		e.CompileToken() // ')'
 
 	case ".": //subroutineCall
@@ -330,7 +362,7 @@ func (e *engine) CompileDo() {
 		sName += ("." + e.o.Current().Content())
 		e.CompileToken() // subroutineName
 		e.CompileToken() // '('
-		e.CompileExpressionList()
+		nArgs = e.CompileExpressionList()
 		e.CompileToken() // ')'
 
 	default:
@@ -380,17 +412,32 @@ func (e *engine) CompileTerm() {
 			e.CompileExpression()
 			e.CompileToken() // ')'
 			return
-		case "-", "~":
-			e.t.Leaf(current_token) // unaryOp
+		case "-":
+			e.t.Leaf(current_token) // unaryOp - arithmetic negation
 			e.CompileTerm()
+			vm.WriteArithmetic(vmWriter.NEG)
+			return
+		case "~":
+			e.t.Leaf(current_token) // unaryOp - boolean negation
+			e.CompileTerm()
+			vm.WriteArithmetic(vmWriter.NOT)
 			return
 		}
 
 	case JackGrammar.KEYWORD:
 		switch current_token.Content() {
-		case "true", "false", "null", "this":
+		case "true":
+			vm.WritePush(vmWriter.CONST, 1)
+			vm.WriteArithmetic(vmWriter.NEG)
 			e.t.Leaf(current_token) // keyword const
 			return
+		case "null", "false":
+			vm.WritePush(vmWriter.CONST, 0)
+		case "this":
+			vm.WritePush(vmWriter.THIS, 0)
+			e.t.Leaf(current_token) // keyword const
+			return
+
 		}
 
 	case JackGrammar.IDENTIFIER:
@@ -408,27 +455,43 @@ func (e *engine) CompileTerm() {
 			e.CompileToken() // ')'
 			return
 		case ".": //subroutineCall
+			sName1 := current_token.Content()
 			e.t.Leaf(current_token) // className | varName
 			e.CompileToken()        // '.'
-			e.CompileToken()        // subroutineName
-			e.CompileToken()        // '('
-			e.CompileExpressionList()
+			sName2 := e.o.Current().Content()
+			e.CompileToken() // subroutineName
+			e.CompileToken() // '('
+			nArgs := e.CompileExpressionList()
 			e.CompileToken() // ')'
+			vm.WriteCall((sName1 + "." + sName2), nArgs)
 			return
 
 		default:
+			varName := current_token.Content()
+			sKind := st.KindOf(varName)
+			sIndex := st.IndexOf(varName)
+			switch sKind {
+			case SymbolTable.VAR:
+				vm.WritePush(vmWriter.LOCAL, sIndex)
+			case SymbolTable.ARG:
+				vm.WritePush(vmWriter.ARG, sIndex)
+			case SymbolTable.STATIC:
+				vm.WritePush(vmWriter.STATIC, sIndex)
+			case SymbolTable.FIELD:
+				panic("I'm not sure what to do with FIELD VARIABLES yet!")
+			}
 			e.t.Leaf(current_token) // varName
 			return
 		}
 	}
 }
 
-func (e *engine) CompileExpressionList() {
-	nArgs = 0
+func (e *engine) CompileExpressionList() int {
+	nArgs := 0
 	e.t = e.t.Branch("expressionList")
 	if e.o.Current().Content() == ")" {
 		e.t = e.t.Up()
-		return
+		return nArgs
 	}
 	e.CompileExpression()
 	nArgs++
@@ -438,6 +501,7 @@ func (e *engine) CompileExpressionList() {
 		nArgs++
 	}
 	e.t = e.t.Up()
+	return nArgs
 }
 
 // -----------------------------------------------------
@@ -483,3 +547,8 @@ func (e *engine) isOperator() bool {
 	}
 	return false
 }
+
+// func isVoidFunc(name string) bool {
+// 	_, ok := void_functions[name]
+// 	return ok
+// }

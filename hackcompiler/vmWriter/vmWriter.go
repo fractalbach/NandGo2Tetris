@@ -36,7 +36,7 @@ const (
 
 var SegmentString = map[Segment]string{
 	CONST:   "constant",
-	ARG:     "arg",
+	ARG:     "argument",
 	LOCAL:   "local",
 	STATIC:  "static",
 	THIS:    "this",
