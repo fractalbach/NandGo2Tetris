@@ -13,17 +13,6 @@ import (
 	"strings"
 )
 
-var example = `
-// Example to test the CompileClass() command
-class DerpClass {
-	static int x;
-	static int y;
-	field string s;
-	field bool b;
-	function void derp() {}
-}
-`
-
 const help_message = `
 Compiles Jack code into Hack Programs for Nand2Tetris.
 

@@ -33,6 +33,7 @@ type SymbolTable interface {
 	IndexOf(string) int
 	PrintClassTable() string
 	PrintSubroutineTable() string
+	Has(string) bool
 }
 
 func NewSymbolTable() SymbolTable {
@@ -99,6 +100,17 @@ func (st *symbolTable) Define(name, type_ string, kind Kind) {
 			index: index,
 		}
 	}
+}
+
+// Has returns true if the given name is in the symbol table; returns
+// false if it is not.
+func (st *symbolTable) Has(name string) bool {
+	_, ok := st.subroutine_table[name]
+	if ok {
+		return true
+	}
+	_, ok = st.class_table[name]
+	return ok
 }
 
 func (st *symbolTable) VarCount(kind Kind) int {

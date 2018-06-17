@@ -22,6 +22,8 @@ var (
 	subroutineName      string
 	symbol_table_output string
 	label_counter       int = 0
+	isConstructor       bool
+	inside_method       bool
 	// void_functions          = make(map[string]bool)
 )
 
@@ -64,6 +66,7 @@ func Run(w io.Writer, tokenizer JackTokenizer.TokenIterator, opt OPTION) {
 	case OP_CODE:
 		buf.WriteTo(w)
 	}
+	symbol_table_output = "" // clean up global variable
 }
 
 func (e *engine) tag(s string) {
@@ -150,7 +153,8 @@ func (e *engine) CompileClassVarDec() {
 // }
 
 // Parameter List = ((type varName) (',' type varName)*)?
-func (e *engine) CompileParameterList() {
+func (e *engine) CompileParameterList() int {
+	n := 0
 	sName := ""
 	sType := ""
 	sKind := SymbolTable.ARG
@@ -161,6 +165,7 @@ func (e *engine) CompileParameterList() {
 		sName = e.o.Current().Content()
 		e.CompileToken() // varName
 		st.Define(sName, sType, sKind)
+		n++
 		for e.o.Current().Content() == "," {
 			e.CompileToken() // ','
 			sType = e.o.Current().Content()
@@ -168,15 +173,23 @@ func (e *engine) CompileParameterList() {
 			sName = e.o.Current().Content()
 			e.CompileToken() // varName
 			st.Define(sName, sType, sKind)
+			n++
 		}
 	}
 	e.t = e.t.Up()
+	return n
 }
 
 func (e *engine) CompileSubroutineDec() {
 	e.t = e.t.Branch("subroutineDec")
-	if e.o.Current().Content() == "method" {
+	isConstructor = false
+	switch e.o.Current().Content() {
+	case "constructor":
+		isConstructor = true
+		inside_method = true
+	case "method":
 		st.Define("this", className, SymbolTable.ARG)
+		inside_method = true
 	}
 	e.CompileToken() // ('constructor' | 'function' | 'method')
 	e.CompileToken() // 'void' | type
@@ -187,6 +200,8 @@ func (e *engine) CompileSubroutineDec() {
 	e.CompileToken() // ')'
 	e.CompileSubroutineBody()
 	e.t = e.t.Up()
+	isConstructor = false // clean up global variable.
+	inside_method = false // no longer inside a method/constructor
 }
 
 // subroutineBody = '{' varDec* statements '}'
@@ -196,12 +211,32 @@ func (e *engine) CompileSubroutineBody() {
 	for e.o.Current().Content() == "var" {
 		e.CompileVarDec()
 	}
-	// writes the vm code for declaring a function at this point,
-	// since all of the local variable declarations have finished:
-	// The subroutine symbol table is complete, and nLocals can be counted.
+	// must call WriteFunction() after CompileVarDec() has been called,
+	// because the VM command needs to know how many local variables
+	// there are in the function.
 	fullname := className + "." + subroutineName
 	nLocals = st.VarCount(SymbolTable.VAR)
 	vm.WriteFunction(fullname, nLocals)
+
+	// check the current symbol table to see if we added a "this" to
+	// the subroutine.  If we have, then we must make sure to write
+	// "push argument 0".
+	if st.Has("this") && st.KindOf("this") == SymbolTable.ARG {
+		vm.WritePush(vmWriter.ARG, 0)
+		vm.WritePop(vmWriter.POINTER, 0)
+	}
+
+	// constructors are special because they need to allocate memory.
+	// determine the sizeOf() by counting the number of fields,
+	// 1. push the size to the stack,
+	// 2. call Memory.alloc(size), which leave a pointer on the stack,
+	// 3. pop stack, changing THIS pointer to the new pointer.
+	if subroutineName == "new" {
+		size := st.VarCount(SymbolTable.FIELD)
+		vm.WritePush(vmWriter.CONST, size)
+		vm.WriteCall("Memory.alloc", 1)
+		vm.WritePop(vmWriter.POINTER, 0)
+	}
 	// continue on to compile the proccesses within the function.
 	e.CompileStatements()
 	e.CompileToken() // '}'
@@ -287,9 +322,9 @@ func (e *engine) CompileLet() {
 }
 
 func (e *engine) CompileIf() {
-	prefix := fmt.Sprint(className, ".", subroutineName, ".label.")
-	label1 := fmt.Sprint(prefix, "if.", label_counter)
-	label2 := fmt.Sprint(prefix, "endif.", label_counter)
+	prefix := "L_"
+	label1 := fmt.Sprint(prefix, "IF", label_counter)
+	label2 := fmt.Sprint(prefix, "ENDIF", label_counter)
 	// finished_first_else := false
 	label_counter++
 	e.t = e.t.Branch("ifStatement")
@@ -316,9 +351,9 @@ func (e *engine) CompileIf() {
 }
 
 func (e *engine) CompileWhile() {
-	prefix := fmt.Sprint(className, ".", subroutineName, ".label.")
-	label1 := fmt.Sprint(prefix, "while.", label_counter)
-	label2 := fmt.Sprint(prefix, "endwhile.", label_counter)
+	prefix := "L_"
+	label1 := fmt.Sprint(prefix, "WHILE", label_counter)
+	label2 := fmt.Sprint(prefix, "ENDWHILE", label_counter)
 	label_counter++
 	vm.WriteLabel(label1)
 	e.t = e.t.Branch("whileStatement")
@@ -349,21 +384,47 @@ func (e *engine) CompileDo() {
 	nArgs := 0
 	sName := current_token.Content()
 
+	// being inside a constructor or method, and having no explicit
+	// receiver, implies that the current object is the receiver.
+	// The pointer to current object is accesible via POINTER 0
+
 	// decide parsing method based on that next token.
 	switch next_token.Content() {
 	case "(": // subroutineCall
+		if inside_method {
+			vm.WritePush(vmWriter.POINTER, 0)
+			nArgs++
+		}
 		e.t.Leaf(current_token) // subroutineName
 		e.CompileToken()        // '('
-		nArgs = e.CompileExpressionList()
+		nArgs += e.CompileExpressionList()
 		e.CompileToken() // ')'
+		// assume that the prefix is the current class name.
+		sName = fmt.Sprint(className, ".", sName)
 
 	case ".": //subroutineCall
+		// lookup the name of the receiver in the symbol table.
+		// If we can find it, then we know it's a variable which
+		// contains a reference to an object.  (now called a receiver).
+		// Push the receiver pointer onto the stack.  the pointer will
+		// become an argument for calling a method.
+		recName := current_token.Content()
+		if st.Has(recName) {
+			segment := kindToSeg[st.KindOf(recName)]
+			index := st.IndexOf(recName)
+			vm.WritePush(segment, index)
+			sName = st.TypeOf(recName)
+			nArgs++
+		}
+		// If we couldn't find the variable in the symbol table,
+		// then assume it was a className, and there is no receiver.
+
 		e.t.Leaf(current_token) // className | varName
 		e.CompileToken()        // '.'
 		sName += ("." + e.o.Current().Content())
 		e.CompileToken() // subroutineName
 		e.CompileToken() // '('
-		nArgs = e.CompileExpressionList()
+		nArgs += e.CompileExpressionList()
 		e.CompileToken() // ')'
 
 	default:
@@ -436,10 +497,13 @@ func (e *engine) CompileTerm() {
 		case "null", "false":
 			vm.WritePush(vmWriter.CONST, 0)
 		case "this":
-			vm.WritePush(vmWriter.THIS, 0)
 			e.t.Leaf(current_token) // keyword const
+			if st.Has("this") && st.KindOf("this") == SymbolTable.ARG {
+				vm.WritePush(vmWriter.ARG, 0)
+				return
+			}
+			vm.WritePush(vmWriter.POINTER, 0)
 			return
-
 		}
 
 	case JackGrammar.IDENTIFIER:
@@ -451,19 +515,41 @@ func (e *engine) CompileTerm() {
 			e.CompileToken()        // ']'
 			return
 		case "(": // subroutineCall
+			nArgs := 0
+			if inside_method {
+				vm.WritePush(vmWriter.POINTER, 0)
+				nArgs++
+			}
+			sName := current_token.Content()
 			e.t.Leaf(current_token) // subroutineName
 			e.CompileToken()        // '('
-			e.CompileExpressionList()
+			nArgs += e.CompileExpressionList()
 			e.CompileToken() // ')'
+			vm.WriteCall((className + "." + sName), nArgs)
 			return
 		case ".": //subroutineCall
+			nArgs := 0
 			sName1 := current_token.Content()
+			// If the name before a "." is a known variable, and is
+			// in our symbol table, then it is being used as a reciever
+			// for a method call.  If this is the case, push it to the
+			// stack, because  it will become argument 0 for the calling
+			// function.
+			if st.Has(sName1) {
+				segment := kindToSeg[st.KindOf(sName1)]
+				index := st.IndexOf(sName1)
+				vm.WritePush(segment, index)
+				// additionally, we need to extract the name of the class
+				// from the variable.  It's the TYPE.
+				sName1 = st.TypeOf(sName1)
+				nArgs++
+			}
 			e.t.Leaf(current_token) // className | varName
 			e.CompileToken()        // '.'
 			sName2 := e.o.Current().Content()
 			e.CompileToken() // subroutineName
 			e.CompileToken() // '('
-			nArgs := e.CompileExpressionList()
+			nArgs += e.CompileExpressionList()
 			e.CompileToken() // ')'
 			vm.WriteCall((sName1 + "." + sName2), nArgs)
 			return
@@ -480,21 +566,21 @@ func (e *engine) CompileTerm() {
 }
 
 func (e *engine) CompileExpressionList() int {
-	nArgs := 0
+	n := 0
 	e.t = e.t.Branch("expressionList")
 	if e.o.Current().Content() == ")" {
 		e.t = e.t.Up()
-		return nArgs
+		return n
 	}
 	e.CompileExpression()
-	nArgs++
+	n++
 	for e.o.Current().Content() == "," {
 		e.CompileToken() // ','
 		e.CompileExpression()
-		nArgs++
+		n++
 	}
 	e.t = e.t.Up()
-	return nArgs
+	return n
 }
 
 // -----------------------------------------------------
