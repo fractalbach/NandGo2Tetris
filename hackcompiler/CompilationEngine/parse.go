@@ -8,6 +8,7 @@ import (
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackGrammar"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/JackTokenizer"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/SymbolTable"
+	"github.com/fractalbach/nandGo2tetris/hackcompiler/Token"
 	"github.com/fractalbach/nandGo2tetris/hackcompiler/vmWriter"
 	"io"
 	"strconv"
@@ -292,19 +293,40 @@ func (e *engine) CompileExpression() {
 func (e *engine) CompileLet() {
 	e.t = e.t.Branch("letStatement")
 	e.CompileToken() // 'let'
+	isArray := false
 	sName := e.o.Current().Content()
 	sKind := st.KindOf(sName)
 	sIndex := st.IndexOf(sName)
+	current_token := e.o.Current()
 	e.CompileToken() // varName
-	for e.o.Current().Content() == "[" {
-		e.CompileToken() // '['
-		e.CompileExpression()
-		e.CompileToken() // ']'
+	/*
+		When assigning a new value to a position in an array, it is treated
+		differently than when compiled as a term. We still need the address
+		of the value, but instead of pushing that value, we are going to
+		save that adresss until after we compile the NEW value.
+
+		1. Push &arr[index] to the stack.
+		2. Pop value into TEMP 1 (reserved for this purpose)
+		3. CompileExpression() leaves a value on the stack.
+		4. Push TEMP1, which still contains &arr[index]
+		5. Pop to POINTER 1, allowing us to follow the pointer
+		6. Pop THIS 0, placing the expression into *arr[index]
+	*/
+	if e.o.Current().Content() == "[" {
+		isArray = true
+		e.pushArrayPointer(current_token) // 1.
+		vm.WritePop(vmWriter.TEMP, 1)     // 2.
 	}
-	e.CompileToken() // '='
-	e.CompileExpression()
-	e.CompileToken() // ';'
-	vm.WritePop(kindToSeg[sKind], sIndex)
+	e.CompileToken()      // '='
+	e.CompileExpression() // <------------- 3.
+	e.CompileToken()      // ';'
+	if isArray {
+		vm.WritePush(vmWriter.TEMP, 1)   // 4.
+		vm.WritePop(vmWriter.POINTER, 1) // 5.
+		vm.WritePop(vmWriter.THAT, 0)    // 6.
+	} else {
+		vm.WritePop(kindToSeg[sKind], sIndex)
+	}
 	e.t = e.t.Up()
 }
 
@@ -509,11 +531,17 @@ func (e *engine) CompileTerm() {
 	case JackGrammar.IDENTIFIER:
 		switch next_token.Content() {
 		case "[":
-			e.t.Leaf(current_token) // varName
-			e.CompileToken()        // '['
-			e.CompileExpression()   // exp
-			e.CompileToken()        // ']'
+			// To access the value in arr[index], we want to get a pointer
+			// to the location of the value, and place it onto the stack.
+			e.pushArrayPointer(current_token)
+			// Now that &arr[index] is on the stack, we want to follow the
+			// pointer.  Save the pointer in 'POINTER 1', which corresponds
+			// to THAT', and access it using 'THAT 0'.  We can use 0 because
+			// we already have the exact address of the value we want.
+			vm.WritePop(vmWriter.POINTER, 1)
+			vm.WritePush(vmWriter.THAT, 0)
 			return
+
 		case "(": // subroutineCall
 			nArgs := 0
 			if inside_method {
@@ -581,6 +609,36 @@ func (e *engine) CompileExpressionList() int {
 	}
 	e.t = e.t.Up()
 	return n
+}
+
+// -----------------------------------------------------
+
+// MACRO for writing vm code.  Pushes a pointer to an indexed position
+// in an array.  Also compiles an expression within, so this function/Macro
+// is likely to be used recurisvely.
+func (e *engine) pushArrayPointer(current_token Token.Token) {
+	// First, push the variable to the stack.
+	// This variable should contain a pointer to the
+	// beginning of the array we want to access.
+	e.t.Leaf(current_token) // varName
+	varName := current_token.Content()
+	segment := kindToSeg[st.KindOf(varName)]
+	symbolIndex := st.IndexOf(varName)
+	vm.WritePush(segment, symbolIndex)
+	// The expression in the brackets contains the [index] of the
+	// desired position, where 0 is the beginning of the array.
+	// CompileExpression will write the neccessary vm code to compute
+	// this value and leave it on top of the stack.
+	e.CompileToken()      // '['
+	e.CompileExpression() // exp
+	e.CompileToken()      // ']'
+	// At this point, there are 2 values sitting on top of the stack:
+	// (top - 1): the address of the beginning of the array.
+	// (top - 0): the index of the array.
+	// We can add the index to the address, giving us the address of
+	// the exact location in the array we want to access.
+	vm.WriteArithmetic(vmWriter.ADD)
+	return
 }
 
 // -----------------------------------------------------
