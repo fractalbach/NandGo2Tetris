@@ -139,19 +139,6 @@ func (e *engine) CompileClassVarDec() {
 	e.t = e.t.Up()
 }
 
-// // CompileSubroutine a single subroutine declaration.
-// func (e *engine) CompileSubroutine() {
-// 	e.t = e.t.Branch("subroutine")
-// 	e.CompileToken() // ('static' | 'field' | 'constructor')
-// 	e.CompileToken() // ('void' | type)
-// 	e.CompileToken() // subroutineName
-// 	e.CompileToken() // '('
-// 	e.CompileParameterList()
-// 	e.CompileToken() // ')'
-// 	e.CompileSubroutineBody()
-// 	e.t = e.t.Up()
-// }
-
 // Parameter List = ((type varName) (',' type varName)*)?
 func (e *engine) CompileParameterList() int {
 	n := 0
@@ -459,6 +446,19 @@ func (e *engine) CompileTerm() {
 	// switch based on the first token's kind.
 	switch current_token.Kind() {
 	case JackGrammar.STRING_CONST:
+		// create a new string, and append characters to it.
+		// Leave a pointer to the string on top of the stack.
+		// An example (
+		// 		https://play.golang.org/p/MxQsrUSU6dD
+		// where a pointer to the array containing "hello world"
+		// is pushed to the stack.
+		str := current_token.Content()
+		vm.WritePush(vmWriter.CONST, len(str))
+		vm.WriteCall("String.new", 1)
+		for _, c := range str {
+			vm.WritePush(vmWriter.CONST, int(c))
+			vm.WriteCall("String.appendChar", 2)
+		}
 		e.t.Leaf(current_token)
 		return
 
@@ -585,10 +585,6 @@ func (e *engine) CompileExpressionList() int {
 
 // -----------------------------------------------------
 
-// Template
-func (e *engine) CompileThing() {
-}
-
 func (e *engine) CurrentToLeaf() {
 	e.t.Leaf(e.o.Current())
 }
@@ -626,8 +622,3 @@ func (e *engine) isOperator() bool {
 	}
 	return false
 }
-
-// func isVoidFunc(name string) bool {
-// 	_, ok := void_functions[name]
-// 	return ok
-// }
