@@ -16,7 +16,13 @@ Also, because it was a lot of fun ;)
 
 - [x] [HACK Assembler](https://github.com/fractalbach/NandGo2Tetris/tree/master/hackasm) converts Assembly to Machine Code.
 - [x] [HACK VM Translator](https://github.com/fractalbach/NandGo2Tetris/tree/master/hackvmslate) converts VM code into assembly.
-- [ ] (***IN PROGRESS***) -  [HACK Compiler](https://github.com/fractalbach/NandGo2Tetris/tree/master/hackcompiler) converts code in a High Level Programming Language into VM code.
+- [x] [HACK Compiler](https://github.com/fractalbach/NandGo2Tetris/tree/master/hackcompiler) converts code in a High Level Programming Language into VM code.
     - [x] Tokenization
     - [x] Semantic Analysis 
-    - [ ] Code Generation (***IN PROGRESS***)
+    - [x] Code Generation
+
+## Example
+
+Here is what it looks like to compile a program written in the "Jack Programming language" into the VM language, then the Assembly Language, and finally into binary.
+
+![copilers](https://user-images.githubusercontent.com/32124562/41803426-920254d8-763d-11e8-83ea-75515d91e5ed.PNG)
